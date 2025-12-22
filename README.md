@@ -35,6 +35,7 @@ npm install
 6. Copie a URL do webhook
 
 ### 3. Configurar `services.json`
+##### * use o services_EXEMPLO.json copie e altere o nome para services.json e edite os dados
 
 Edite o arquivo `services.json` e adicione:
 - Sua webhook URL do Discord
@@ -68,7 +69,8 @@ Edite o arquivo `services.json` e adicione:
 Execute como administrador:
 ```powershell
 # Opção 1: Usar o script fornecido
-.\listar-servicos.bat
+node .\discover-services.js
+# ira gerar o arquivo discovered-services.json com todos os serviços do windows
 
 # Opção 2: Comando manual
 Get-Service | Format-Table Name, DisplayName, Status
@@ -81,14 +83,13 @@ Get-Service | Format-Table Name, DisplayName, Status
 ```powershell
 # Como administrador
 node monitor.js
+
+# em produção recomendo usar PM2
+pm2 start monitor.js --name "Monitor Serviços Windows"
 ```
 
-Você deverá ver:
-```
-info: Carregados X serviços para monitoramento
-info: Webhook URL: https://discord.com/api/webhooks/...
-info: Iniciando monitoramento de X serviços
-```
+Na posta logs deve ver as informações de erros e debugs.
+
 
 ## 📖 Estrutura de Configuração
 
@@ -192,17 +193,15 @@ AdobeARMservice foi reiniciado automaticamente
 
 ```
 monitor-servicos/
-├── monitor.js                # Aplicação principal
+├── monitor.js               # Aplicação principal
 ├── package.json             # Dependências
 ├── services.json            # Configuração dos serviços
-├── .env.example            # Exemplo de variáveis de ambiente
-├── MELHORIAS.md            # Documentação de melhorias
-├── README.md               # Este arquivo
-├── listar-servicos.bat     # Script para listar serviços
+├── README.md                # Este arquivo
+├── discover-services.js     # Script para listar serviços
 ├── discovered-services.json # (gerado) Serviços descobertos
 └── logs/
-    ├── error.log           # Logs de erro
-    └── combined.log        # Todos os logs
+    ├── error.log            # Logs de erro
+    └── combined.log         # Todos os logs
 ```
 
 ## 🛠️ Troubleshooting
@@ -219,7 +218,7 @@ monitor-servicos/
 ### Problema: "Serviço não encontrado"
 **Solução:** 
 1. Use o nome técnico, não o de exibição
-2. Execute `listar-servicos.bat` para obter nomes corretos
+2. Execute `discover-services.js` para obter nomes corretos
 3. Verifique se o serviço existe em seu sistema
 
 ### Problema: Erro de permissão ao reiniciar

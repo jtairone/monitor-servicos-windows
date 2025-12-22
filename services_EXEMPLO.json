@@ -1,0 +1,21 @@
+{
+  "services": [
+    {
+      "name": "NomeServico",
+      "displayName": "Nome Exibido do Serviço",
+      "critical": true, 
+      "description": "Descrição do serviço",
+      "restartOnFailure": true
+    }
+  ],
+  "discord": {
+    "webhookUrl": "https://discord.com/api/webhooks/SEU_ID/SEU_TOKEN",
+    "sendStartupMessage": true,
+    "notifyOnRecovery": true
+  },
+  "monitoring": {
+    "checkInterval": 30000,
+    "maxRetries": 3,
+    "logLevel": "info"
+  }
+}
