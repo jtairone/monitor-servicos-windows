@@ -2,10 +2,30 @@
 const os = require('os');
 const { Webhook, MessageBuilder } = require('discord-webhook-node');
 const logger = require('./logger');
+const CONFIG = require('./services.json');
+
+// Validar services
+if (!CONFIG.services || typeof CONFIG.services !== 'object') {
+    throw new Error('Serviços para monitorar não configurado em services.json');
+}
+// Validar webhook URL
+if (!CONFIG.discord.webhookUrl || typeof CONFIG.discord.webhookUrl !== 'string') {
+    throw new Error('Webhook URL do Discord não configurado em services.json');
+}
+
+const services = CONFIG.services || [];
+const servicesStatus = new Map();
+const retryCount = new Map();
+//const IMAGE_URL = 'https://api.redux.ind.br:2096/img/logofolha_redux.png';
+// Inicializar webhook do Discord
+const hook = new Webhook(CONFIG.discord.webhookUrl);
+hook.setUsername('Windows Service Monitor');
+//hook.setAvatar(IMAGE_URL);
+
 
 async function sendDiscordNotification(serviceConfig, oldStatus, newStatus) {
         try {
-            if (!this.hook) {
+            if (!hook) {
                 logger.warn('Webhook não inicializado');
                 return;
             }
@@ -44,12 +64,12 @@ async function sendDiscordNotification(serviceConfig, oldStatus, newStatus) {
                 }
             }
             
-            await this.hook.send(embed);
+            await hook.send(embed);
             logger.info(`Notificação Discord enviada para ${serviceConfig.name}`);
             
         } catch (error) {
             logger.error('Erro ao enviar notificação Discord:', error.message);
         }
   }
-
-  module.exports = sendDiscordNotification;
+  //sendDiscordNotification({ name: 'Example Service', displayName: 'Serviço Exemplo' }, { running: false }, { running: true });
+  module.exports = { sendDiscordNotification, hook };

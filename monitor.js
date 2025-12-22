@@ -4,18 +4,12 @@ const os = require('os');
 const fs = require('fs').promises;
 const path = require('path');
 const logger = require('./logger');
-
+const {sendDiscordNotification, hook } = require('./sendNotification');
 // Configurações
-const CONFIG = {
-    checkInterval: 30000, // 30 segundos
-    servicesFile: 'services.json',
-    maxRetries: 3,
-    webhookUrl: null // Será carregado do arquivo services.json
-};
+const CONFIG = require('./services.json');
 
 class ServiceMonitor {
     constructor() {
-        this.hook = null;
         this.services = [];
         this.serviceStatus = new Map();
         this.retryCount = new Map();
@@ -23,40 +17,13 @@ class ServiceMonitor {
 
     async loadServices() {
         try {
-            const data = await fs.readFile(CONFIG.servicesFile, 'utf8');
-            const config = JSON.parse(data);
-            this.services = config.services || [];
-            
-            // Carregar configurações do arquivo
-            if (config.discord && config.discord.webhookUrl) {
-                CONFIG.webhookUrl = config.discord.webhookUrl;
-            }
-            
-            if (config.monitoring) {
-                if (config.monitoring.checkInterval) {
-                    CONFIG.checkInterval = config.monitoring.checkInterval;
-                }
-                if (config.monitoring.maxRetries) {
-                    CONFIG.maxRetries = config.monitoring.maxRetries;
-                }
-            }
-            
-            // Validar webhook URL
-            if (!CONFIG.webhookUrl || typeof CONFIG.webhookUrl !== 'string') {
-                throw new Error('Webhook URL do Discord não configurado em services.json');
-            }
-            
-            // Inicializar webhook
-            this.hook = new Webhook(CONFIG.webhookUrl);
-            this.hook.setUsername('Windows Service Monitor');
-            //this.hook.setAvatar('https://cdn-icons-png.flaticon.com/512/3050/3050526.png');
-            
+            this.services = CONFIG.services || [];
             if (this.services.length === 0) {
                 throw new Error('Nenhum serviço configurado no services.json');
             }
             
             logger.info(`Carregados ${this.services.length} serviços para monitoramento`);
-            logger.info(`Webhook URL: ${CONFIG.webhookUrl.substring(0, 50)}...`);
+            logger.info(`Webhook URL: ${CONFIG.discord.webhookUrl.substring(0, 50)}...`);
             
             // Inicializar status
             for (const service of this.services) {
@@ -65,14 +32,8 @@ class ServiceMonitor {
             }
             
         } catch (error) {
-            if (error.code === 'ENOENT') {
-                // Criar arquivo de exemplo se não existir
-                await this.createExampleConfig();
-                logger.info('Arquivo services.json criado com configuração de exemplo');
-            } else {
-                logger.error('Erro ao carregar serviços:', error);
-                throw error;
-            }
+            logger.error('Erro ao carregar serviços:', error);
+            throw error;
         }
     }
 
@@ -127,55 +88,6 @@ class ServiceMonitor {
         });
     }
 
-    async sendDiscordNotification(serviceConfig, oldStatus, newStatus) {
-        try {
-            if (!this.hook) {
-                logger.warn('Webhook não inicializado');
-                return;
-            }
-
-            const hostname = os.hostname();
-            const timestamp = new Date().toLocaleString('pt-BR');
-            const displayName = serviceConfig.displayName || serviceConfig.name;
-            
-            let embed;
-            
-            if (newStatus.running) {
-                // Serviço iniciou/recuperou
-                embed = new MessageBuilder()
-                    .setTitle('✅ Serviço Iniciado')
-                    .setDescription(`**${displayName}** está rodando`)
-                    .addField('📡 Servidor', hostname || 'Unknown', true)
-                    .addField('⏰ Horário', timestamp, true)
-                    .addField('🔄 Status Anterior', oldStatus && oldStatus.running ? 'Rodando' : 'Parado', true)
-                    .setColor('#00ff00')
-                    .setFooter('Service Monitor v1.0')
-                    .setTimestamp();
-            } else {
-                // Serviço parou
-                embed = new MessageBuilder()
-                    .setTitle('❌ Serviço Parado')
-                    .setDescription(`**${displayName}** parou de funcionar`)
-                    .addField('📡 Servidor', hostname || 'Unknown', true)
-                    .addField('⏰ Horário', timestamp, true)
-                    .addField('🔧 Status', newStatus.status || 'stopped', true)
-                    .setColor('#ff0000')
-                    .setFooter('Service Monitor v1.0')
-                    .setTimestamp();
-                
-                if (newStatus.error) {
-                    embed.addField('⚠️ Erro', `\`\`\`${newStatus.error.substring(0, 1000)}\`\`\``, false);
-                }
-            }
-            
-            await this.hook.send(embed);
-            logger.info(`Notificação Discord enviada para ${serviceConfig.name}`);
-            
-        } catch (error) {
-            logger.error('Erro ao enviar notificação Discord:', error.message);
-        }
-    }
-
     async attemptRestart(serviceName, displayName) {
         return new Promise(async (resolve) => {
             const { exec } = require('child_process');
@@ -224,8 +136,8 @@ class ServiceMonitor {
                                         .setFooter('Service Monitor v1.0')
                                         .setTimestamp();
                                     
-                                    if (this.hook) {
-                                        this.hook.send(embed).catch(err => {
+                                    if (hook) {
+                                        hook.send(embed).catch(err => {
                                             logger.error('Erro ao enviar notificação de restart:', err.message);
                                         });
                                     }
@@ -263,13 +175,6 @@ class ServiceMonitor {
         try {
             const currentStatus = await this.checkServiceStatus(serviceConfig.name);
             const previousStatus = this.serviceStatus.get(serviceConfig.name);
-            /* console.log(`Monitoring Service: ${serviceConfig.name}`);
-            console.log('Previous Status:')
-            console.log(previousStatus)
-            console.log('Current Status:')
-            console.log(currentStatus) */
-
-
             // Log detalhado para debug
             logger.debug(`[${new Date().toLocaleTimeString('pt-BR')}] Verificando ${serviceConfig.name}:`);
             logger.debug(`  Status Anterior: ${previousStatus ? (previousStatus.running ? '✓ Rodando' : '✗ Parado') : 'Nunca verificado'}`);
@@ -280,16 +185,16 @@ class ServiceMonitor {
                 logger.warn(`⚠️  MUDANÇA DETECTADA em ${serviceConfig.name}: ${currentStatus.running ? 'Rodando' : 'Parado'}`);
                 
                 // Enviar notificação
-                await this.sendDiscordNotification(serviceConfig, previousStatus || {}, currentStatus);
+                await sendDiscordNotification(serviceConfig, previousStatus || {}, currentStatus);
                 
                 // Se parou e tem restart habilitado
                 if (!currentStatus.running && serviceConfig.restartOnFailure) {
                     const retries = this.retryCount.get(serviceConfig.name) + 1;
                     this.retryCount.set(serviceConfig.name, retries);
                     
-                    logger.warn(`🔴 Serviço ${serviceConfig.name} PAROU! Tentativa ${retries}/${CONFIG.maxRetries}`);
+                    logger.warn(`🔴 Serviço ${serviceConfig.name} PAROU! Tentativa ${retries}/${CONFIG.monitoring.maxRetries}`);
                     
-                    if (retries <= CONFIG.maxRetries) {
+                    if (retries <= CONFIG.monitoring.maxRetries) {
                         logger.info(`🔄 Tentando reiniciar ${serviceConfig.name}...`);
                         const success = await this.attemptRestart(serviceConfig.name, serviceConfig.displayName);
                         
@@ -322,7 +227,7 @@ class ServiceMonitor {
             await this.loadServices();
             
             // Enviar mensagem de inicialização
-            if (this.services.length > 0 && this.hook) {
+            if (this.services.length > 0 && this.services) {
                 try {
                     const hostname = os.hostname();
                     const servicesList = this.services
@@ -339,7 +244,7 @@ class ServiceMonitor {
                         .setFooter('Service Monitor v1.0')
                         .setTimestamp();
                     
-                    await this.hook.send(embed);
+                    await hook.send(embed);
                     logger.info('Mensagem de inicialização enviada para Discord');
                 } catch (error) {
                     logger.error('Erro ao enviar mensagem de inicialização:', error.message);
@@ -347,7 +252,7 @@ class ServiceMonitor {
             }
             
             logger.info(`Iniciando monitoramento de ${this.services.length} serviços`);
-            logger.info(`Intervalo de verificação: ${CONFIG.checkInterval / 1000} segundos`);
+            logger.info(`Intervalo de verificação: ${CONFIG.monitoring.checkInterval / 1000} segundos`);
             
             // Verificar todos os serviços imediatamente
             logger.info('▶️  Executando primeira verificação...');
@@ -367,7 +272,7 @@ class ServiceMonitor {
                 }
                 
                 logger.info(`✅ Verificação #${checkCount} concluída\n`);
-            }, CONFIG.checkInterval);
+            }, CONFIG.monitoring.checkInterval);
             
             logger.info('Monitor em execução. Pressione Ctrl+C para parar.');
             
