@@ -1,0 +1,43 @@
+# Dependências
+node_modules/
+package-lock.json
+yarn.lock
+
+# Variáveis de ambiente
+.env
+.env.local
+.env.*.local
+
+# Configuração sensível
+services.json
+discovered-services.json
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporários
+tmp/
+temp/
+*.tmp
+
+# Backup
+*.backup
+*.bak
+
+# Compilados
+dist/
+
+# Outros
+discovered-services.json

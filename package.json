@@ -1,0 +1,29 @@
+{
+  "name": "monitor-servicos",
+  "version": "1.1.0",
+  "main": "monitor.js",
+  "scripts": {
+    "start": "node monitor.js",
+    "dev": "node monitor.js",
+    "install-service": "node install.js",
+    "uninstall-service": "node uninstall.js",
+    "list-services": "powershell -Command \"Get-Service | Format-Table Name, DisplayName, Status -AutoSize\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "windows",
+    "services",
+    "monitor",
+    "discord",
+    "webhook",
+    "notification"
+  ],
+  "author": "Tairone Morais <jtaironemorais@hotmail.com> (https://github.com/jtairone)",
+  "license": "ISC",
+  "description": "Monitora serviços do Windows e envia notificações via Discord",
+  "dependencies": {
+    "discord-webhook-node": "^1.1.8",
+    "node-windows": "^1.0.0-beta.8",
+    "winston": "^3.19.0"
+  }
+}
