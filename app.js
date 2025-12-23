@@ -1,0 +1,327 @@
+const express = require('express');
+const { execSync } = require('child_process');
+const { exec, spawn } = require('child_process');
+const fs = require('fs').promises;
+const path = require('path');
+
+console.log('🔍 Iniciando aplicação...');
+console.log('[1] Express carregado');
+
+// Variável global para armazenar o processo do monitor
+let monitorProcess = null;
+
+// Logger simples se não conseguir carregar
+let logger;
+try {
+    logger = require('./logger');
+    console.log('[2] Logger carregado');
+} catch (e) {
+    console.log('[2] Logger não encontrado, usando console');
+    logger = {
+        info: (msg) => console.log('[INFO]', msg),
+        error: (msg) => console.error('[ERROR]', msg),
+        warn: (msg) => console.warn('[WARN]', msg),
+        debug: (msg) => console.debug('[DEBUG]', msg)
+    };
+}
+
+console.log('[3] Criando aplicação Express');
+const app = express();
+const PORT = 3000;
+console.log('[4] Aplicação criada');
+
+// Middleware
+console.log('[5] Configurando middlewares');
+app.use(express.json());
+app.use(express.static('public'));
+console.log('[6] Middlewares configurados');
+
+// Rotas para servir arquivos estáticos
+console.log('[7] Configurando rotas');
+try {
+    app.get('/', (req, res) => {
+        res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    });
+    console.log('[8] Rota GET / configurada');
+} catch (e) {
+    console.error('[ERRO na rota GET] :', e.message);
+}
+
+// API: Descobrir serviços (rodar discover-services.js)
+try {
+    app.post('/api/discover-services', async (req, res) => {
+    try {
+        logger.info('Iniciando descoberta de serviços...');
+        
+        return new Promise((resolve) => {
+            // Comando PowerShell melhorado que traz o Status em texto
+            const psCommand = `powershell -NoProfile -Command "Get-Service | Select-Object Name, DisplayName, Status | ConvertTo-Json"`;
+            
+            exec(psCommand, 
+                { shell: 'cmd.exe', maxBuffer: 1024 * 1024 * 10, timeout: 30000 }, 
+                async (error, stdout, stderr) => {
+                    try {
+                        if (error || !stdout) {
+                            logger.error('Erro ao executar PowerShell:', error?.message || 'Sem saída');
+                            logger.error('Stderr:', stderr);
+                            return res.status(500).json({ error: 'Erro ao descobrir serviços: ' + (error?.message || stderr) });
+                        }
+                        
+                        // Remover linhas em branco
+                        const cleanOutput = stdout.trim();
+                        if (!cleanOutput) {
+                            return res.status(500).json({ error: 'PowerShell não retornou dados' });
+                        }
+                        
+                        const services = JSON.parse(cleanOutput);
+                        
+                        // Processar array ou objeto único
+                        let serviceArray = Array.isArray(services) ? services : [services];
+                        
+                        // Mapear para o formato desejado com mapeamento de status
+                        const processedServices = serviceArray.map(s => {
+                            let status = 'Unknown';
+                            
+                            // Converter Status para texto
+                            if (typeof s.Status === 'number') {
+                                // Enum do PowerShell: 1=Stopped, 2=Start Pending, 3=Stop Pending, 
+                                // 4=Running, 5=Continue Pending, 6=Pause Pending, 7=Paused
+                                status = (s.Status === 4) ? 'Running' : 'Stopped';
+                            } else if (typeof s.Status === 'string') {
+                                // Se vier como string, normalizar
+                                status = s.Status.toLowerCase().includes('running') ? 'Running' : 'Stopped';
+                            }
+                            
+                            return {
+                                name: s.Name,
+                                displayName: s.DisplayName || s.Name,
+                                status: status
+                            };
+                        });
+                        
+                        // Salvar no discovered-services.json
+                        const discoveredPath = path.join(__dirname, 'discovered-services.json');
+                        await fs.writeFile(discoveredPath, JSON.stringify(processedServices, null, 2));
+                        
+                        logger.info(`Descobertos ${processedServices.length} serviços`);
+                        res.json({ 
+                            success: true, 
+                            services: processedServices,
+                            count: processedServices.length 
+                        });
+                        resolve();
+                    } catch (parseError) {
+                        logger.error('Erro ao processar resposta:', parseError.message);
+                        logger.error('Output recebido:', stdout);
+                        res.status(500).json({ error: 'Erro ao processar serviços: ' + parseError.message });
+                        resolve();
+                    }
+                }
+            );
+        });
+        
+    } catch (error) {
+        logger.error('Erro na rota discover-services:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+    console.log('[9] Rota POST /api/discover-services configurada');
+} catch (e) {
+    console.error('[ERRO na rota POST] :', e.message);
+}
+
+// API: Carregar discovered-services.json
+app.get('/api/discovered-services', async (req, res) => {
+    try {
+        const discoveredPath = path.join(__dirname, 'discovered-services.json');
+        const data = await fs.readFile(discoveredPath, 'utf-8');
+        const services = JSON.parse(data);
+        
+        res.json(services);
+    } catch (error) {
+        logger.error('Erro ao carregar discovered-services:', error.message);
+        res.status(500).json({ error: 'Arquivo não encontrado. Execute descoberta primeiro.' });
+    }
+});
+
+// API: Carregar services.json (serviços monitorados)
+app.get('/api/monitored-services', async (req, res) => {
+    try {
+        const servicesPath = path.join(__dirname, 'services.json');
+        const data = await fs.readFile(servicesPath, 'utf-8');
+        const config = JSON.parse(data);
+        
+        res.json(config.services || []);
+    } catch (error) {
+        logger.error('Erro ao carregar services.json:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Adicionar serviço ao monitoramento
+app.post('/api/add-monitored-service', async (req, res) => {
+    try {
+        const { name, displayName, restartOnFailure } = req.body;
+        
+        if (!name || !displayName) {
+            return res.status(400).json({ error: 'Nome e displayName são obrigatórios' });
+        }
+        
+        const servicesPath = path.join(__dirname, 'services.json');
+        const data = await fs.readFile(servicesPath, 'utf-8');
+        const config = JSON.parse(data);
+        
+        // Verificar se serviço já existe
+        const exists = config.services.some(s => s.name === name);
+        if (exists) {
+            return res.status(400).json({ error: 'Serviço já está sendo monitorado' });
+        }
+        
+        // Adicionar novo serviço
+        config.services.push({
+            name: name,
+            displayName: displayName,
+            critical: false,
+            description: `Adicionado em ${new Date().toLocaleString('pt-BR')}`,
+            restartOnFailure: Boolean(restartOnFailure)
+        });
+        
+        // Salvar
+        await fs.writeFile(servicesPath, JSON.stringify(config, null, 2));
+        
+        logger.info(`Serviço ${name} adicionado ao monitoramento`);
+        res.json({ 
+            success: true, 
+            message: `Serviço ${displayName} adicionado com sucesso!`,
+            service: config.services[config.services.length - 1]
+        });
+        
+    } catch (error) {
+        logger.error('Erro ao adicionar serviço:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Remover serviço do monitoramento
+app.delete('/api/monitored-services/:name', async (req, res) => {
+    try {
+        const { name } = req.params;
+        
+        const servicesPath = path.join(__dirname, 'services.json');
+        const data = await fs.readFile(servicesPath, 'utf-8');
+        const config = JSON.parse(data);
+        
+        // Remover serviço
+        config.services = config.services.filter(s => s.name !== name);
+        
+        // Salvar
+        await fs.writeFile(servicesPath, JSON.stringify(config, null, 2));
+        
+        logger.info(`Serviço ${name} removido do monitoramento`);
+        res.json({ success: true, message: 'Serviço removido com sucesso!' });
+        
+    } catch (error) {
+        logger.error('Erro ao remover serviço:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Iniciar servidor
+console.log('[10] Iniciando servidor...');
+const server = app.listen(PORT, () => {
+    console.log(`✅ Servidor rodando em http://localhost:${PORT}`);
+    logger.info(`🌐 Servidor rodando em http://localhost:${PORT}`);
+    logger.info('Abra seu navegador e acesse http://localhost:3000');
+    
+    // Iniciar monitor.js automaticamente após o servidor estar pronto
+    console.log('[11] Iniciando Monitor de Serviços...');
+    startMonitor();
+});
+
+server.on('error', (err) => {
+    console.error('❌ Erro ao iniciar servidor:', err.message);
+    process.exit(1);
+});
+
+// Função para iniciar o monitor.js como processo filho
+function startMonitor() {
+    try {
+        const monitorPath = path.join(__dirname, 'monitor.js');
+        
+        // Spawn do monitor.js como processo filho
+        monitorProcess = spawn('node', [monitorPath], {
+            stdio: ['ignore', 'pipe', 'pipe'], // Capturar stdout e stderr
+            detached: false
+        });
+        
+        // Capturar stdout do monitor
+        if (monitorProcess.stdout) {
+            monitorProcess.stdout.on('data', (data) => {
+                console.log(`[Monitor] ${data.toString().trim()}`);
+            });
+        }
+        
+        // Capturar stderr do monitor
+        if (monitorProcess.stderr) {
+            monitorProcess.stderr.on('data', (data) => {
+                console.error(`[Monitor ERRO] ${data.toString().trim()}`);
+            });
+        }
+        
+        monitorProcess.on('error', (err) => {
+            logger.error('❌ Erro ao iniciar monitor.js:', err.message);
+            console.error('Erro ao iniciar monitor.js:', err.message);
+        });
+        
+        monitorProcess.on('exit', (code, signal) => {
+            logger.warn(`⚠️ Monitor encerrado com código ${code}`);
+            console.warn(`⚠️ Monitor encerrado com código ${code}`);
+            
+            // Reiniciar monitor se ele falhar
+            if (code !== 0 && code !== null) {
+                console.log('🔄 Tentando reiniciar monitor em 5 segundos...');
+                setTimeout(() => {
+                    startMonitor();
+                }, 5000);
+            }
+        });
+        
+        //console.log('✅ Monitor iniciado com sucesso (PID: ' + monitorProcess.pid + ')');
+        logger.info('✅ Monitor iniciado com sucesso (PID: ' + monitorProcess.pid + ')');
+        
+    } catch (err) {
+        logger.error('Erro ao executar startMonitor:', err.message);
+        //console.error('Erro ao executar startMonitor:', err.message);
+    }
+}
+
+// Handler para encerramento gracioso
+process.on('SIGINT', () => {
+    console.log('\n🛑 Encerrando aplicação...');
+    logger.info('Encerrando aplicação');
+    
+    // Encerrar processo do monitor se estiver rodando
+    if (monitorProcess) {
+        console.log('⏸️  Encerrando Monitor...');
+        monitorProcess.kill('SIGINT');
+    }
+    
+    // Encerrar servidor após 2 segundos
+    setTimeout(() => {
+        console.log('✅ Aplicação encerrada');
+        logger.info('Aplicação encerrada');
+        process.exit(0);
+    }, 2000);
+});
+
+process.on('SIGTERM', () => {
+    console.log('\n🛑 Encerrando aplicação (SIGTERM)...');
+    if (monitorProcess) {
+        monitorProcess.kill('SIGTERM');
+    }
+    
+    setTimeout(() => {
+        console.log('✅ Aplicação encerrada');
+        process.exit(0);
+    }, 2000);
+});

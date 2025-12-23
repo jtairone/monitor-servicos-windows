@@ -357,4 +357,4 @@ Tairone Morais
 
 ---
 
-**Última atualização:** 22 de dezembro de 2025
+**Última atualização:** 23 de dezembro de 2025
