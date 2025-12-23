@@ -1,4 +1,9 @@
+
 # 🖥️ Windows Service Monitor com Notificações Discord
+
+<img width="320" height="450" alt="iniciando aplicação" src="https://github.com/user-attachments/assets/720f8140-ea1a-4152-8a94-1f866d93b374" />
+
+<img width="320" height="450" alt="Serviço parou reinicia" src="https://github.com/user-attachments/assets/b2f449ae-44c0-44b6-8f89-10e298839704" />
 
 Uma aplicação Node.js que monitora serviços do Windows e envia notificações via Discord quando um serviço para de funcionar.
 
