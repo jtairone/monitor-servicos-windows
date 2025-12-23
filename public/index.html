@@ -3,81 +3,162 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Service Monitor - Gerenciador de Serviços</title>
+    <title>Service Monitor Pro | Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="img/logo.png" type="image/png">
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <h1>🔍 Service Monitor</h1>
-            <p>Gerenciador de Serviços do Windows</p>
+
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <div class="logo-box">
+                <i class="fas fa-terminal"></i>
+            </div>
+            <span>Monitor Pro</span>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <button class="nav-item active" data-tab="discover">
+                <i class="fas fa-search"></i> Descobrir
+            </button>
+            <button class="nav-item" data-tab="monitored">
+                <i class="fas fa-chart-line"></i> Monitorados
+            </button>
+            <button class="nav-item" data-tab="settings">
+                <i class="fas fa-cog"></i> Configurações
+            </button>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="status-indicator">
+                <span class="dot pulse"></span> Sistema Ativo
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="top-bar">
+            <div class="page-title">
+                <h1>Gerenciador de Serviços</h1>
+                <p>Monitoramento em tempo real do host local</p>
+            </div>
+            
+            <div class="stats-cards">
+                <div class="stat-card">
+                    <span class="stat-label">Total</span>
+                    <span class="stat-value" id="stat-total">--</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label text-success">Ativos</span>
+                    <span class="stat-value text-success" id="stat-running">--</span>
+                </div>
+            </div>
         </header>
 
-        <!-- Tabs de Navegação -->
-        <div class="tabs">
-            <button class="tab-btn active" data-tab="discover">Descobrir Serviços</button>
-            <button class="tab-btn" data-tab="monitored">Serviços Monitorados</button>
-        </div>
+        <div id="discover" class="tab-pane active">
+            <section class="card">
+                <div class="card-header">
+                    <div>
+                        <h2>Serviços do Windows</h2>
+                        <p>Liste e selecione serviços para monitoramento contínuo.</p>
+                    </div>
+                    <button id="discoverBtn" class="btn btn-primary">
+                        <i class="fas fa-sync-alt"></i> Descobrir Serviços
+                    </button>
+                </div>
 
-        <!-- Tab 1: Descobrir Serviços -->
-        <div id="discover" class="tab-content active">
-            <div class="section">
-                <h2>📋 Descobrir Serviços do Windows</h2>
-                <p>Clique no botão abaixo para listar todos os serviços disponíveis no sistema.</p>
-                
-                <button id="discoverBtn" class="btn btn-primary btn-lg">
-                    <span class="btn-icon">🔎</span> Descobrir Serviços
-                </button>
-
-                <div id="discoverMessage" class="message"></div>
-
-                <!-- Filtro e Busca -->
-                <div class="filter-section" id="filterSection" style="display: none;">
-                    <input 
-                        type="text" 
-                        id="searchInput" 
-                        placeholder="Buscar por nome ou exibição..." 
-                        class="search-input"
-                    >
-                    <select id="statusFilter" class="filter-select">
+                <div id="filterSection" class="filters" style="display: none;">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="searchInput" placeholder="Filtrar por nome ou descrição...">
+                    </div>
+                    <select id="statusFilter" class="custom-select">
                         <option value="">Todos os Status</option>
                         <option value="Running">Rodando</option>
                         <option value="Stopped">Parado</option>
                     </select>
                 </div>
 
-                <!-- Lista de Serviços Descobertos -->
-                <div id="servicesList" class="services-list"></div>
-            </div>
+                <div id="servicesList" class="grid-list">
+                    </div>
+            </section>
         </div>
 
-        <!-- Tab 2: Serviços Monitorados -->
-        <div id="monitored" class="tab-content">
-            <div class="section">
-                <h2>👁️ Serviços Monitorados</h2>
-                <p>Serviços que estão sendo monitorados pelo monitor.js</p>
-
-                <button id="refreshMonitoredBtn" class="btn btn-secondary">
-                    <span class="btn-icon">🔄</span> Atualizar Lista
-                </button>
-
-                <div id="monitoredMessage" class="message"></div>
-
-                <!-- Lista de Serviços Monitorados -->
-                <div id="monitoredList" class="services-list"></div>
-            </div>
+        <div id="monitored" class="tab-pane">
+            <section class="card">
+                <div class="card-header">
+                    <div>
+                        <h2>Monitoramento Ativo</h2>
+                        <p>Serviços sendo observados pelo monitor.js</p>
+                    </div>
+                    <button id="refreshMonitoredBtn" class="btn btn-outline">
+                        <i class="fas fa-redo"></i> Atualizar
+                    </button>
+                </div>
+                
+                
+                <div id="monitoredList" class="grid-list">
+                    </div>
+            </section>
         </div>
-    </div>
+        <div id="settings" class="tab-pane">
+            <section class="card">
+                <div class="card-header">
+                    <div>
+                        <h2>Configurações do Sistema</h2>
+                        <p>Gerencie notificações, intervalos de busca e porta do servidor.</p>
+                    </div>
+                    <button id="saveSettingsBtn" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Salvar Alterações
+                    </button>
+                </div>
 
-    <!-- Modal de Carregamento -->
+                <div class="settings-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="settings-group">
+                        <h3><i class="fas fa-server"></i> Geral</h3>
+                        <div class="field">
+                            <label>Porta do Servidor (Requer reinicialização)</label>
+                            <input type="number" id="cfg-port" class="search-input" style="width: 100%">
+                        </div>
+                        <div class="field">
+                            <label>Intervalo de Checagem (ms)</label>
+                            <input type="number" id="cfg-interval" class="search-input" style="width: 100%" placeholder="Ex: 30000">
+                            <div id="interval-helper" class="helper-text">
+                                * <span id="ms-value">0</span>ms (milissegundo) equivalente a <span id="sec-value">0</span>s (segundos)
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <h3><i class="fab fa-discord"></i> Discord Webhook</h3>
+                        <div class="field">
+                            <label>URL do Webhook</label>
+                            <input type="text" id="cfg-discord-url" class="search-input" style="width: 100%">
+                        </div>
+                        <div class="toggle-group" style="margin-top: 10px;">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="cfg-discord-startup">
+                                <span class="slider"></span>
+                            </label>
+                            <span>Notificar ao iniciar</span>
+                        </div>
+                    </div>
+                </div>
+                
+            </section>
+        </div>
+    </main>
+
     <div id="loadingModal" class="modal">
-        <div class="loading-spinner">
+        <div class="modal-content">
             <div class="spinner"></div>
-            <p id="loadingText">Carregando...</p>
+            <p id="loadingText">Processando requisição...</p>
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="js/sweetalert2.js"></script>
+    <script src="js/script.js"></script>
 </body>
 </html>

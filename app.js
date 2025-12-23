@@ -25,9 +25,17 @@ try {
     };
 }
 
+let config;
+try {
+    const data = fs.readFileSync(path.join(__dirname, 'services.json'), 'utf8');
+    config = JSON.parse(data);
+} catch (e) {
+    config = { servidor: { port: 3000 } }; // Fallback
+}
+
 console.log('[3] Criando aplicação Express');
 const app = express();
-const PORT = 3000;
+const PORT = config.servidor?.port || 3000;
 console.log('[4] Aplicação criada');
 
 // Middleware
@@ -129,6 +137,40 @@ try {
 } catch (e) {
     console.error('[ERRO na rota POST] :', e.message);
 }
+
+// Obter configurações completas (Discord, Monitoramento, Servidor)
+app.get('/api/settings', async (req, res) => {
+    try {
+        const data = await fs.readFile(path.join(__dirname, 'services.json'), 'utf8');
+        const fullConfig = JSON.parse(data);
+        // Removemos a lista de serviços para focar apenas nas definições
+        const { services, ...settings } = fullConfig;
+        res.json(settings);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Salvar configurações
+app.post('/api/settings', async (req, res) => {
+    try {
+        const newSettings = req.body;
+        const filePath = path.join(__dirname, 'services.json');
+        const data = await fs.readFile(filePath, 'utf8');
+        const fullConfig = JSON.parse(data);
+
+        // Mescla as novas configurações mantendo os serviços intactos
+        const updatedConfig = {
+            services: fullConfig.services,
+            ...newSettings
+        };
+
+        await fs.writeFile(filePath, JSON.stringify(updatedConfig, null, 2));
+        res.json({ success: true, message: "Configurações salvas! Reinicie o servidor para aplicar os novos parâmetros." });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // API: Carregar discovered-services.json
 app.get('/api/discovered-services', async (req, res) => {
