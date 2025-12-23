@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "main": "monitor.js",
   "scripts": {
-    "start": "node monitor.js",
+    "start": "node --ignore discovered-services.js monitor.js",
     "dev": "node monitor.js",
     "install-service": "node install.js",
     "uninstall-service": "node uninstall.js",
