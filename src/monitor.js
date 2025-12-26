@@ -6,7 +6,7 @@ const path = require('path');
 const logger = require('./logger');
 const {sendDiscordNotification, hook } = require('./sendNotification');
 // Configurações
-const CONFIG = require('./services.json');
+const CONFIG = require('../services.json');
 
 class ServiceMonitor {
     constructor() {
@@ -42,126 +42,129 @@ class ServiceMonitor {
             const { exec } = require('child_process');
             
             // Usar PowerShell para verificar o status do serviço
-            const command = `powershell -Command "Get-Service -Name '${serviceName}' -ErrorAction SilentlyContinue | Select-Object -Property Status, DisplayName"`;
+            const psCommand = `(Get-Service -Name '${serviceName}' -ErrorAction SilentlyContinue).Status`;
             
-            exec(command, (error, stdout, stderr) => {
-                try {
-                    if (error || !stdout) {
+            exec(`powershell -NoProfile -Command "${psCommand}"`, 
+                { shell: 'powershell.exe', windowsHide: true, timeout: 10000 }, 
+                (error, stdout, stderr) => {
+                    try {
+                        const status = stdout.trim().toLowerCase();
+                        
+                        if (status === 'running') {
+                            resolve({
+                                exists: true,
+                                running: true,
+                                status: 'running',
+                                error: null
+                            });
+                        } else if (status === 'stopped') {
+                            resolve({
+                                exists: true,
+                                running: false,
+                                status: 'stopped',
+                                error: null
+                            });
+                        } else if (status === '' || error) {
+                            resolve({
+                                exists: false,
+                                running: false,
+                                error: `Serviço "${serviceName}" não encontrado no sistema`
+                            });
+                        } else {
+                            resolve({
+                                exists: true,
+                                running: false,
+                                status: status,
+                                error: null
+                            });
+                        }
+                    } catch (err) {
                         resolve({
                             exists: false,
                             running: false,
-                            error: `Serviço "${serviceName}" não encontrado no sistema`
-                        });
-                        return;
-                    }
-                    
-                    // Verificar se o serviço existe e seu status
-                    if (stdout.includes('Running')) {
-                        resolve({
-                            exists: true,
-                            running: true,
-                            status: 'running',
-                            error: null
-                        });
-                    } else if (stdout.includes('Stopped')) {
-                        resolve({
-                            exists: true,
-                            running: false,
-                            status: 'stopped',
-                            error: null
-                        });
-                    } else {
-                        resolve({
-                            exists: false,
-                            running: false,
-                            error: `Serviço "${serviceName}" não encontrado no sistema`
+                            error: err.message
                         });
                     }
-                } catch (err) {
-                    resolve({
-                        exists: false,
-                        running: false,
-                        error: err.message
-                    });
-                }
-            });
+                });
         });
     }
 
     async attemptRestart(serviceName, displayName) {
-        return new Promise(async (resolve) => {
+        return new Promise((resolve) => {
             const { exec } = require('child_process');
             const path = require('path');
             const fs = require('fs').promises;
             const os = require('os');
             
             try {
-                // Arquivo temporário para capturar resultado
-                const tempFile = path.join(os.tmpdir(), `restart-${serviceName}-${Date.now()}.txt`);
+                // Criar script batch que faz o restart
+                const batFile = path.join(os.tmpdir(), `restart-${serviceName}-${Date.now()}.bat`);
+                const logFile = path.join(os.tmpdir(), `restart-${serviceName}-${Date.now()}.log`);
                 
-                // Caminho do script PowerShell elevado
-                const scriptPath = path.join(__dirname, 'scripts', 'restart-service.ps1');
+                const batContent = `@echo off
+net stop "${serviceName}" /y >>"${logFile}" 2>&1
+timeout /t 1 /nobreak >nul
+net start "${serviceName}" >>"${logFile}" 2>&1
+if %ERRORLEVEL% equ 0 (
+    echo SUCCESS>>"${logFile}"
+) else (
+    echo FAILED>>"${logFile}"
+)
+`;
                 
-                // Comando que executa o script com elevação de privilégios
-                const elevateCommand = `Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', '${scriptPath}', '-ServiceName', '${serviceName}', '-OutputFile', '${tempFile}' -Wait`;
-                
-                // Executar comando de elevação
-                exec(`powershell -Command "${elevateCommand}"`, { windowsHide: true }, async (error, stdout, stderr) => {
-                    try {
-                        // Aguardar o arquivo ser criado (com timeout)
-                        let attempts = 0;
-                        while (attempts < 10) {
-                            try {
-                                const result = await fs.readFile(tempFile, 'utf-8');
-                                const output = result.trim().toUpperCase();
-                                
-                                logger.info(`Resultado do restart: ${output}`);
-                                
-                                // Limpar arquivo temporário
-                                await fs.unlink(tempFile).catch(() => {});
-                                
-                                if (output.includes('SUCCESS')) {
-                                    logger.info(`Serviço ${serviceName} reiniciado com sucesso`);
-                                    
-                                    // Notificar no Discord sobre o restart
-                                    const hostname = os.hostname();
-                                    const timestamp = new Date().toLocaleString('pt-BR');
-                                    
-                                    const embed = new MessageBuilder()
-                                        .setTitle('🔄 Serviço Reiniciado')
-                                        .setDescription(`**${displayName}** foi reiniciado automaticamente`)
-                                        .addField('📡 Servidor', hostname || 'Unknown', true)
-                                        .addField('⏰ Horário', timestamp, true)
-                                        .setColor('#ffa500')
-                                        .setFooter('Service Monitor v1.0')
-                                        .setTimestamp();
-                                    
-                                    if (hook) {
-                                        hook.send(embed).catch(err => {
-                                            logger.error('Erro ao enviar notificação de restart:', err.message);
-                                        });
-                                    }
-                                    
-                                    resolve(true);
-                                } else {
-                                    logger.error(`Falha ao reiniciar ${serviceName}: ${output}`);
-                                    resolve(false);
-                                }
-                                return;
-                            } catch (readErr) {
-                                // Arquivo ainda não existe, tentar novamente
-                                attempts++;
-                                await new Promise(r => setTimeout(r, 200));
-                            }
-                        }
+                // Escrever arquivo bat
+                fs.writeFile(batFile, batContent, 'utf8').then(() => {
+                    // Executar com elevação
+                    const elevateCmd = `powershell -NoProfile -Command "Start-Process -FilePath 'cmd.exe' -ArgumentList '/c','${batFile}' -Verb RunAs -Wait -WindowStyle Hidden"`;
+                    
+                    exec(elevateCmd, { windowsHide: true, timeout: 40000 }, async (error, stdout, stderr) => {
+                        // Aguardar arquivo de log ser criado
+                        await new Promise(r => setTimeout(r, 2000));
                         
-                        // Timeout: arquivo não foi criado
-                        logger.error(`Timeout ao aguardar resultado do restart de ${serviceName}`);
-                        resolve(false);
-                    } catch (err) {
-                        logger.error(`Erro ao processar restart de ${serviceName}:`, err.message);
-                        resolve(false);
-                    }
+                        try {
+                            const logContent = await fs.readFile(logFile, 'utf8');
+                            const output = logContent.toUpperCase();
+                            
+                            logger.info(`[${serviceName}] Resultado: ${output.substring(0, 100)}`);
+                            
+                            // Limpar arquivos temporários
+                            await fs.unlink(batFile).catch(() => {});
+                            await fs.unlink(logFile).catch(() => {});
+                            
+                            if (output.includes('SUCCESS')) {
+                                logger.info(`✅ Serviço ${serviceName} reiniciado com sucesso`);
+                                
+                                const hostname = os.hostname();
+                                const timestamp = new Date().toLocaleString('pt-BR');
+                                
+                                const embed = new MessageBuilder()
+                                    .setTitle('🔄 Serviço Reiniciado')
+                                    .setDescription(`**${displayName}** foi reiniciado automaticamente`)
+                                    .addField('📡 Servidor', hostname || 'Unknown', true)
+                                    .addField('⏰ Horário', timestamp, true)
+                                    .setColor('#ffa500')
+                                    .setFooter('Service Monitor v1.0')
+                                    .setTimestamp();
+                                
+                                if (hook) {
+                                    hook.send(embed).catch(err => {
+                                        logger.error('Erro ao enviar notificação:', err.message);
+                                    });
+                                }
+                                
+                                resolve(true);
+                            } else {
+                                logger.error(`❌ Falha ao reiniciar ${serviceName}`);
+                                resolve(false);
+                            }
+                        } catch (readErr) {
+                            logger.error(`Erro ao ler resultado do restart:`, readErr.message);
+                            resolve(false);
+                        }
+                    });
+                }).catch(writeErr => {
+                    logger.error(`Erro ao criar arquivo restart:`, writeErr.message);
+                    resolve(false);
                 });
                 
             } catch (err) {

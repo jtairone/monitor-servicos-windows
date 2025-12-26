@@ -13,7 +13,7 @@ let monitorProcess = null;
 // Logger simples se não conseguir carregar
 let logger;
 try {
-    logger = require('./logger');
+    logger = require('./src/logger');
     console.log('[2] Logger carregado');
 } catch (e) {
     console.log('[2] Logger não encontrado, usando console');
@@ -108,7 +108,7 @@ try {
                         });
                         
                         // Salvar no discovered-services.json
-                        const discoveredPath = path.join(__dirname, 'discovered-services.json');
+                        const discoveredPath = path.join(__dirname, './src/discovered-services.json');
                         await fs.writeFile(discoveredPath, JSON.stringify(processedServices, null, 2));
                         
                         logger.info(`Descobertos ${processedServices.length} serviços`);
@@ -175,7 +175,7 @@ app.post('/api/settings', async (req, res) => {
 // API: Carregar discovered-services.json
 app.get('/api/discovered-services', async (req, res) => {
     try {
-        const discoveredPath = path.join(__dirname, 'discovered-services.json');
+        const discoveredPath = path.join(__dirname, './src/discovered-services.json');
         const data = await fs.readFile(discoveredPath, 'utf-8');
         const services = JSON.parse(data);
         
@@ -273,7 +273,7 @@ console.log('[10] Iniciando servidor...');
 const server = app.listen(PORT, () => {
     console.log(`✅ Servidor rodando em http://localhost:${PORT}`);
     logger.info(`🌐 Servidor rodando em http://localhost:${PORT}`);
-    logger.info('Abra seu navegador e acesse http://localhost:3000');
+    logger.info(`Abra seu navegador e acesse http://localhost:${PORT}`);
     
     // Iniciar monitor.js automaticamente após o servidor estar pronto
     console.log('[11] Iniciando Monitor de Serviços...');
@@ -288,7 +288,7 @@ server.on('error', (err) => {
 // Função para iniciar o monitor.js como processo filho
 function startMonitor() {
     try {
-        const monitorPath = path.join(__dirname, 'monitor.js');
+        const monitorPath = path.join(__dirname, './src/monitor.js');
         
         // Spawn do monitor.js como processo filho
         monitorProcess = spawn('node', [monitorPath], {

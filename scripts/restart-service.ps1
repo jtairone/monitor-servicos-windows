@@ -53,3 +53,8 @@ catch {
     }
     exit 1
 }
+    if (-not [string]::IsNullOrEmpty($OutputFile)) {
+        "FAILED: $errorMsg" | Out-File -FilePath $OutputFile -Encoding UTF8 -NoNewline
+    }
+    exit 1
+}
