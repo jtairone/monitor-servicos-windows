@@ -4,11 +4,9 @@
   "main": "monitor.js",
   "scripts": {
     "start": "nodemon app.js",
-    "dev": "node monitor.js",
+    "dev": "node src/monitor.js",
     "web": "node app.js",
     "start-all": "node app.js",
-    "install-service": "node install.js",
-    "uninstall-service": "node uninstall.js",
     "list-services": "powershell -Command \"Get-Service | Format-Table Name, DisplayName, Status -AutoSize\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
