@@ -1,0 +1,3 @@
+{
+  "ignore": ["src/discovered-services.json", "services.json", "public/", "views/", "node_modules/"]
+}

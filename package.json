@@ -3,10 +3,9 @@
   "version": "1.1.0",
   "main": "monitor.js",
   "scripts": {
-    "start": "nodemon --ignore discovered-services.js monitor.js",
-    "dev": "node monitor.js",
-    "install-service": "node install.js",
-    "uninstall-service": "node uninstall.js",
+    "start": "nodemon app.js",
+    "dev": "node src/monitor.js",
+    "web": "node app.js",
     "list-services": "powershell -Command \"Get-Service | Format-Table Name, DisplayName, Status -AutoSize\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -23,6 +22,7 @@
   "description": "Monitora serviços do Windows e envia notificações via Discord",
   "dependencies": {
     "discord-webhook-node": "^1.1.8",
+    "express": "^4.18.2",
     "node-windows": "^1.0.0-beta.8",
     "winston": "^3.19.0"
   }

@@ -10,7 +10,7 @@ yarn.lock
 
 # Configuração sensível
 services.json
-discovered-services.json
+src/discovered-services.json
 
 # Logs
 logs/

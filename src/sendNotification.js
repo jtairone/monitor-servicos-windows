@@ -2,7 +2,7 @@
 const os = require('os');
 const { Webhook, MessageBuilder } = require('discord-webhook-node');
 const logger = require('./logger');
-const CONFIG = require('./services.json');
+const CONFIG = require('../services.json');
 
 // Validar services
 if (!CONFIG.services || typeof CONFIG.services !== 'object') {
