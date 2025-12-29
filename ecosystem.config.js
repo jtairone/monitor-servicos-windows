@@ -1,6 +1,6 @@
 module.exports = {
   apps: [{
-    name: 'monitor-servicos',
+    name: 'monitor-servicos-windows',
     script: 'app.js',
     watch: false, // Desabilita watch mode em produção
     instances: 'max', // Ou número específico
