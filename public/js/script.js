@@ -129,7 +129,6 @@ function renderDiscoveredServices(services) {
         servicesList.innerHTML = `<div class="empty-state"><h3>Nenhum serviço encontrado</h3></div>`;
         return;
     }
-
     servicesList.innerHTML = services.map(service => `
         <div class="service-item" data-service-name="${service.name}">
             <div class="service-info">
@@ -142,10 +141,21 @@ function renderDiscoveredServices(services) {
             <div class="service-controls" style="margin-top:15px; display:flex; justify-content:space-between; align-items:center;">
                 <label class="toggle-switch">
                     <input type="checkbox" class="restart-toggle" checked title="Auto-restart">
-                    <span class="slider"></span>
+                    <span class="slider">Auto-restart</span>
                 </label>
                 <button class="btn btn-primary" onclick="addMonitoredService('${service.name}', '${service.displayName}', this)">
                     <i class="fas fa-plus"></i> Monitorar
+                </button>
+            </div>
+            <div class="action-buttons" style="margin-top:10px; display:flex; gap:8px;">
+                <button class="btn btn-success btn-sm" ${service.status === 'Running' ? 'disabled': ''} onclick="startService('${service.name}")">
+                    <i class="fas fa-play"></i> Start
+                </button>
+                <button class="btn btn-danger btn-sm" ${service.status !== 'Running' ? 'disabled': ''} onclick="stopService('${service.name}')">
+                    <i class="fas fa-stop"></i> Stop
+                </button>
+                <button class="btn btn-warning btn-sm" ${service.status !== 'Running' ? 'disabled': ''} onclick="restartService('${service.name}')">
+                    <i class="fas fa-redo"></i> Reiniciar
                 </button>
             </div>
         </div>
@@ -223,6 +233,17 @@ function renderMonitoredServices(services) {
             <button class="btn btn-outline" style="margin-top:15px; width:100%; color: var(--danger)" onclick="removeMonitoredService('${s.name}', this)">
                 <i class="fas fa-trash-alt"></i> Remover
             </button>
+            <div class="action-buttons" style="margin-top:10px; display:flex; gap:8px;">
+                <button class="btn btn-success btn-sm" ${s.status === 'Running' ? 'disabled': ''} onclick="startService('${s.name}')">
+                    <i class="fas fa-play"></i> Start
+                </button>
+                <button class="btn btn-danger btn-sm" ${s.status !== 'Running' ? 'disabled': ''} onclick="stopService('${s.name}')">
+                    <i class="fas fa-stop"></i> Stop
+                </button>
+                <button class="btn btn-warning btn-sm" ${s.status !== 'Running' ? 'disabled': ''} onclick="restartService('${s.name}')">
+                    <i class="fas fa-redo"></i> Reiniciar
+                </button>
+            </div>
         </div>
     `).join('');
 }
