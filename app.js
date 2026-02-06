@@ -3,6 +3,7 @@ const { execSync } = require('child_process');
 const { exec, spawn } = require('child_process');
 const { promisify } = require('util');
 const fs = require('fs').promises;
+const fs_o = require('fs');
 const path = require('path');
 const os = require('os');
 const execAsync = promisify(exec);
@@ -89,7 +90,7 @@ try {
 
 let config;
 try {
-    const data = fs.readFileSync(path.join(__dirname, 'services.json'), 'utf8');
+    const data = fs_o.readFileSync(path.join(__dirname, 'services.json'), 'utf8');
     config = JSON.parse(data);
 } catch (e) {
     config = { servidor: { port: 3000 } }; // Fallback
