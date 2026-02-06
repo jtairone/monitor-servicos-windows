@@ -147,8 +147,8 @@ function renderDiscoveredServices(services) {
                     <i class="fas fa-plus"></i> Monitorar
                 </button>
             </div>
-            <div class="action-buttons" style="margin-top:10px; display:flex; gap:8px;">
-                <button class="btn btn-success btn-sm" ${service.status === 'Running' ? 'disabled': ''} onclick="startService('${service.name}")">
+            <div class="action-buttons" style="margin-top:15px; display:flex; gap:10px; justify-content: center">
+                <button class="btn btn-success btn-sm" ${service.status === 'Running' ? 'disabled': ''} onclick="startService('${service.name}')">
                     <i class="fas fa-play"></i> Start
                 </button>
                 <button class="btn btn-danger btn-sm" ${service.status !== 'Running' ? 'disabled': ''} onclick="stopService('${service.name}')">
@@ -234,18 +234,91 @@ function renderMonitoredServices(services) {
                 <i class="fas fa-trash-alt"></i> Remover
             </button>
             <div class="action-buttons" style="margin-top:10px; display:flex; gap:8px;">
-                <button class="btn btn-success btn-sm" ${s.status === 'Running' ? 'disabled': ''} onclick="startService('${s.name}')">
+                <button class="btn btn-success btn-sm" ${s.status !== 'Running' ? 'disabled': ''} onclick="startService('${s.name}')">
                     <i class="fas fa-play"></i> Start
                 </button>
-                <button class="btn btn-danger btn-sm" ${s.status !== 'Running' ? 'disabled': ''} onclick="stopService('${s.name}')">
+                <button class="btn btn-danger btn-sm" ${s.status === 'Running' ? 'disabled': ''} onclick="stopService('${s.name}')">
                     <i class="fas fa-stop"></i> Stop
                 </button>
-                <button class="btn btn-warning btn-sm" ${s.status !== 'Running' ? 'disabled': ''} onclick="restartService('${s.name}')">
+                <button class="btn btn-warning btn-sm" ${s.status === 'Running' ? 'disabled': ''} onclick="restartService('${s.name}')">
                     <i class="fas fa-redo"></i> Reiniciar
                 </button>
             </div>
         </div>
     `).join('');
+}
+
+async function startService(name) {
+    try {
+        const response = await fetch(`/api/startservice/${name}`, { method: 'POST' });
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || 'Falha ao iniciar serviço');
+        }
+
+        // Atualiza status na lista de descobertos (memória)
+        allDiscoveredServices = allDiscoveredServices.map(s =>
+            s.name === name ? { ...s, status: 'Running' } : s
+        );
+        updateTopStats(allDiscoveredServices);
+        filterServices(); // re-renderiza respeitando filtros atuais
+
+        // Atualiza lista de monitorados
+        await loadMonitoredServices();
+
+        showMessage(data.message || `Serviço ${name} iniciado`, 'success');
+    } catch (error) {
+        showMessage(`Erro ao iniciar ${name}: ${error.message}`, 'error');
+    }
+}
+
+async function stopService(name) {
+    try {
+        const response = await fetch(`/api/stopservice/${name}`, { method: 'POST' });
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || 'Falha ao parar serviço');
+        }
+
+        // Atualiza status na lista de descobertos
+        allDiscoveredServices = allDiscoveredServices.map(s =>
+            s.name === name ? { ...s, status: 'Stopped' } : s
+        );
+        updateTopStats(allDiscoveredServices);
+        filterServices();
+
+        await loadMonitoredServices();
+
+        showMessage(data.message || `Serviço ${name} parado`, 'success');
+    } catch (error) {
+        showMessage(`Erro ao parar ${name}: ${error.message}`, 'error');
+    }
+}
+
+async function restartService(name) {
+    try {
+        const response = await fetch(`/api/restartservice/${name}`, { method: 'POST' });
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || 'Falha ao reiniciar serviço');
+        }
+
+        // Após reiniciar, assumimos Running se o backend retornou sucesso
+        allDiscoveredServices = allDiscoveredServices.map(s =>
+            s.name === name ? { ...s, status: 'Running' } : s
+        );
+        updateTopStats(allDiscoveredServices);
+        filterServices();
+
+        await loadMonitoredServices();
+
+        showMessage(data.message || `Serviço ${name} reiniciado`, 'success');
+    } catch (error) {
+        showMessage(`Erro ao reiniciar ${name}: ${error.message}`, 'error');
+    }
 }
 
 async function removeMonitoredService(name, button) {

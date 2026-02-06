@@ -97,6 +97,28 @@ pm2 start app.js --name "Service Monitor Web"
 pm2 start src/monitor.js --name "Service Monitor"
 ```
 
+### 5. Executar como Serviço do Windows (node-windows)
+
+Para que o monitor consiga iniciar/parar/reiniciar serviços com mais estabilidade, você pode rodar a aplicação como **serviço do Windows** usando o `node-windows`:
+
+1. Instale a dependência (uma vez):
+   ```powershell
+   npm install node-windows
+   ```
+2. Abra o **PowerShell** ou **Prompt de Comando** como **Administrador**  
+   (botão direito → "Executar como administrador").
+3. Navegue até a pasta do projeto:
+   ```powershell
+   cd C:\"Caminho pasta do projeto"\monitor-servicos
+   ```
+4. Execute o script que registra o serviço:
+   ```powershell
+   node service.js
+   ```
+5. Após a instalação, abra `services.msc` e procure por `MonitorServicos`.
+   - Verifique se o serviço está em execução.
+   - Opcional: ajuste a conta de Logon do serviço se precisar de permissões específicas.
+
 A interface estará disponível em: **http://localhost:3000**
 
 ##### * **Se porta padrão for 3000 se tiver alterado no services.json usar a denifida lá**

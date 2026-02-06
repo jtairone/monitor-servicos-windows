@@ -1,11 +1,73 @@
 const express = require('express');
 const { execSync } = require('child_process');
 const { exec, spawn } = require('child_process');
+const { promisify } = require('util');
 const fs = require('fs').promises;
 const path = require('path');
+const os = require('os');
+const execAsync = promisify(exec);
 
 console.log('🔍 Iniciando aplicação...');
 console.log('[1] Express carregado');
+
+async function runServiceAction(serviceName, action) {
+    try {
+        console.log(`🔧 Executando ${action} no serviço: ${serviceName}`);
+        
+        let psCommand = '';
+        
+        switch (action) {
+            case 'stop':
+                psCommand = `Stop-Service -Name "${serviceName}" -Force -ErrorAction Stop; Write-Output "SUCCESS"`;
+                break;
+            case 'start':
+                psCommand = `Start-Service -Name "${serviceName}" -ErrorAction Stop; Write-Output "SUCCESS"`;
+                break;
+            case 'restart':
+                psCommand = `Restart-Service -Name "${serviceName}" -Force -ErrorAction Stop; Write-Output "SUCCESS"`;
+                break;
+            default:
+                throw new Error(`Ação não reconhecida: ${action}`);
+        }
+        
+        // Construir comando PowerShell com tratamento de erro
+        const cmd = `powershell -NoProfile -Command "try { ${psCommand} } catch { Write-Output 'FAILED: ' + \\$_.Exception.Message }"`;
+        
+        console.log(`Comando executado: ${cmd}`);
+        
+        return new Promise((resolve) => {
+            exec(cmd, {
+                windowsHide: true,
+                timeout: 30000,
+                shell: 'cmd.exe'
+            }, (error, stdout, stderr) => {
+                const output = stdout.trim();
+                console.log(`📋 Output: ${output}`);
+                
+                if (stderr) {
+                    console.error(`⚠️ Stderr: ${stderr}`);
+                }
+                
+                if (error) {
+                    console.error(`❌ Erro ao executar: ${error.message}`);
+                    resolve(false);
+                    return;
+                }
+                
+                // Verificar se foi bem-sucedido
+                const success = output.includes('SUCCESS') && !output.includes('FAILED');
+                console.log(`✅ Resultado: ${success ? 'Sucesso' : 'Falha'}`);
+                
+                resolve(success);
+            });
+        });
+        
+    } catch (error) {
+        console.error(`❌ Erro em runServiceAction: ${error.message}`);
+        return false;
+    }
+}
+
 
 // Variável global para armazenar o processo do monitor
 let monitorProcess = null;
@@ -265,6 +327,65 @@ app.delete('/api/monitored-services/:name', async (req, res) => {
     } catch (error) {
         logger.error('Erro ao remover serviço:', error.message);
         res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/startservice/:serviceName', async (req, res) => {
+    const { serviceName } = req.params;
+    try {
+        const result = await runServiceAction(serviceName, 'start');
+        if (!result) {
+            throw new Error('Falha ao iniciar o serviço');
+        }
+
+        res.json({ success: true, message: `Serviço ${serviceName} iniciado com sucesso!` });
+
+    } catch (error) {
+        logger.error(`Erro ao iniciar serviço ${serviceName}: ${error.message}`);
+        res.status(500).json({ 
+            success: false, 
+            message: `Erro ao iniciar serviço: ${error.message}` 
+        });
+    }
+});
+
+app.post('/api/stopservice/:serviceName', async (req, res) => {
+    const { serviceName } = req.params;
+    try {
+        const result = await runServiceAction(serviceName, 'stop');
+        console.log(result)
+        if (!result) {
+            throw new Error('Falha ao parar o serviço');
+        }
+
+        res.json({ success: true, message: `Serviço ${serviceName} parado com sucesso!` });
+
+    } catch (error) {
+        console.log(error)
+        logger.error(`Erro ao parar serviço ${serviceName}: ${error.message}`);
+        res.status(500).json({ 
+            success: false, 
+            message: `Erro ao parar serviço: ${error.message}` 
+        });
+    }
+});
+
+app.post('/api/restartservice/:serviceName', async (req, res) => {
+    const { serviceName } = req.params;
+    try {
+        const result = await runServiceAction(serviceName, 'restart');
+        if (!result) {
+            throw new Error('Falha ao reiniciar o serviço');
+        }
+
+        res.json({ success: true, message: `Serviço ${serviceName} reiniciado com sucesso!` });
+
+    } catch (error) {
+        logger.error(`Erro ao reiniciar serviço ${serviceName}: ${error.message}`);
+        res.status(500).json({ 
+            success: false, 
+            message: `Erro ao reiniciar serviço: ${error.message}` 
+        });
     }
 });
 
