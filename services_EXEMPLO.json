@@ -8,6 +8,9 @@
       "restartOnFailure": true
     }
   ],
+  "servidor": {
+    "port": 3000
+  },
   "discord": {
     "webhookUrl": "https://discord.com/api/webhooks/SEU_ID/SEU_TOKEN",
     "sendStartupMessage": true,
