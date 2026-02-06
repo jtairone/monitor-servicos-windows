@@ -40,5 +40,21 @@ svc.on('uninstall', () => {
 });
 
 // Executa a instalação quando rodar `node service.js`
-svc.install();
+//svc.install();
 
+const command = process.argv[2];
+
+if (command === 'uninstall') {
+  console.log('Desinstalando serviço "MonitorServicos"...');
+  svc.uninstall();
+} else if (command === 'start') {
+  console.log('Iniciando serviço "MonitorServicos"...');
+  svc.start();
+} else if (command === 'stop') {
+  console.log('Parando serviço "MonitorServicos"...');
+  svc.stop();
+} else {
+  // Padrão: instala (para manter compatibilidade)
+  console.log('Instalando serviço "MonitorServicos"...');
+  svc.install();
+}
