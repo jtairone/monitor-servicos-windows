@@ -206,7 +206,14 @@ async function loadMonitoredServices() {
     showLoading('Atualizando lista...');
     try {
         const response = await fetch('/api/monitored-services');
-        allMonitoredServices = await response.json();
+        const data = await response.json();
+
+        // Se o backend não enviar status, assumimos que inicialmente estão "Running"
+        allMonitoredServices = data.map(s => ({
+            ...s,
+            status: s.status || 'Running'
+        }));
+
         renderMonitoredServices(allMonitoredServices);
     } catch (error) {
         showMessage('Erro ao carregar monitorados', 'error');
@@ -220,12 +227,18 @@ function renderMonitoredServices(services) {
         monitoredList.innerHTML = `<div class="empty-state"><h3>Sem serviços monitorados</h3></div>`;
         return;
     }
-    monitoredList.innerHTML = services.map(s => `
+    monitoredList.innerHTML = services.map(s => {
+        const isRunning = (s.status || 'Running') === 'Running';
+
+        return `
         <div class="service-item">
             <div class="service-info">
                 <div class="service-name" style="color:var(--primary)">${s.name}</div>
                 <div class="service-display">${s.displayName}</div>
-                <div style="font-size:0.75rem; margin-top:8px">
+                <div style="font-size:0.75rem; margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                    <span class="status-pill ${isRunning ? 'running' : 'stopped'}">
+                        ${isRunning ? '● Rodando' : '○ Parado'}
+                    </span>
                     <span class="status-pill running">PROTEGIDO</span>
                     ${s.restartOnFailure ? '<span class="status-pill running">AUTO-RESTART</span>' : ''}
                 </div>
@@ -234,18 +247,18 @@ function renderMonitoredServices(services) {
                 <i class="fas fa-trash-alt"></i> Remover
             </button>
             <div class="action-buttons" style="margin-top:10px; display:flex; gap:8px;">
-                <button class="btn btn-success btn-sm" ${s.status !== 'Running' ? 'disabled': ''} onclick="startService('${s.name}')">
+                <button class="btn btn-success btn-sm" ${isRunning ? 'disabled': ''} onclick="startService('${s.name}')">
                     <i class="fas fa-play"></i> Start
                 </button>
-                <button class="btn btn-danger btn-sm" ${s.status === 'Running' ? 'disabled': ''} onclick="stopService('${s.name}')">
+                <button class="btn btn-danger btn-sm" ${!isRunning ? 'disabled': ''} onclick="stopService('${s.name}')">
                     <i class="fas fa-stop"></i> Stop
                 </button>
-                <button class="btn btn-warning btn-sm" ${s.status === 'Running' ? 'disabled': ''} onclick="restartService('${s.name}')">
+                <button class="btn btn-warning btn-sm" ${!isRunning ? 'disabled': ''} onclick="restartService('${s.name}')">
                     <i class="fas fa-redo"></i> Reiniciar
                 </button>
             </div>
         </div>
-    `).join('');
+    `}).join('');
 }
 
 async function startService(name) {
@@ -264,8 +277,11 @@ async function startService(name) {
         updateTopStats(allDiscoveredServices);
         filterServices(); // re-renderiza respeitando filtros atuais
 
-        // Atualiza lista de monitorados
-        await loadMonitoredServices();
+        // Atualiza status na lista de monitorados (apenas em memória)
+        allMonitoredServices = allMonitoredServices.map(s =>
+            s.name === name ? { ...s, status: 'Running' } : s
+        );
+        renderMonitoredServices(allMonitoredServices);
 
         showMessage(data.message || `Serviço ${name} iniciado`, 'success');
     } catch (error) {
@@ -289,7 +305,11 @@ async function stopService(name) {
         updateTopStats(allDiscoveredServices);
         filterServices();
 
-        await loadMonitoredServices();
+        // Atualiza status na lista de monitorados (apenas em memória)
+        allMonitoredServices = allMonitoredServices.map(s =>
+            s.name === name ? { ...s, status: 'Stopped' } : s
+        );
+        renderMonitoredServices(allMonitoredServices);
 
         showMessage(data.message || `Serviço ${name} parado`, 'success');
     } catch (error) {
@@ -313,7 +333,11 @@ async function restartService(name) {
         updateTopStats(allDiscoveredServices);
         filterServices();
 
-        await loadMonitoredServices();
+        // Atualiza status na lista de monitorados (apenas em memória)
+        allMonitoredServices = allMonitoredServices.map(s =>
+            s.name === name ? { ...s, status: 'Running' } : s
+        );
+        renderMonitoredServices(allMonitoredServices);
 
         showMessage(data.message || `Serviço ${name} reiniciado`, 'success');
     } catch (error) {

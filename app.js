@@ -12,7 +12,7 @@ console.log('[1] Express carregado');
 
 async function runServiceAction(serviceName, action) {
     try {
-        console.log(`🔧 Executando ${action} no serviço: ${serviceName}`);
+        //console.log(`🔧 Executando ${action} no serviço: ${serviceName}`);
         
         let psCommand = '';
         
@@ -33,7 +33,7 @@ async function runServiceAction(serviceName, action) {
         // Construir comando PowerShell com tratamento de erro
         const cmd = `powershell -NoProfile -Command "try { ${psCommand} } catch { Write-Output 'FAILED: ' + \\$_.Exception.Message }"`;
         
-        console.log(`Comando executado: ${cmd}`);
+       // console.log(`Comando executado: ${cmd}`);
         
         return new Promise((resolve) => {
             exec(cmd, {
