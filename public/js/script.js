@@ -207,12 +207,7 @@ async function loadMonitoredServices() {
     try {
         const response = await fetch('/api/monitored-services');
         const data = await response.json();
-
-        // Se o backend não enviar status, assumimos que inicialmente estão "Running"
-        allMonitoredServices = data.map(s => ({
-            ...s,
-            status: s.status || 'Running'
-        }));
+        allMonitoredServices = data;
 
         renderMonitoredServices(allMonitoredServices);
     } catch (error) {

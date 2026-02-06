@@ -100,6 +100,66 @@ const app = express();
 const PORT = config.servidor?.port || 3000;
 console.log('[4] Aplicação criada');
 
+async function getServicesStatusMap(serviceNames) {
+    if (!Array.isArray(serviceNames) || serviceNames.length === 0) return new Map();
+
+    // Escapar aspas simples para PowerShell
+    const escaped = serviceNames.map(n => String(n).replace(/'/g, "''"));
+    const nameList = escaped.map(n => `'${n}'`).join(',');
+
+    return new Promise((resolve) => {
+        const psCommand = `powershell -NoProfile -Command "Get-Service -Name @(${nameList}) -ErrorAction SilentlyContinue | Select-Object Name, Status | ConvertTo-Json"`;
+
+        exec(psCommand, { shell: 'cmd.exe', maxBuffer: 1024 * 1024 * 2, timeout: 15000 }, (error, stdout) => {
+            try {
+                if (error || !stdout) return resolve(new Map());
+
+                const clean = stdout.trim();
+                if (!clean) return resolve(new Map());
+
+                const parsed = JSON.parse(clean);
+                const arr = Array.isArray(parsed) ? parsed : [parsed];
+                const map = new Map();
+
+                for (const item of arr) {
+                    if (!item?.Name) continue;
+
+                    const rawStatus = item.Status;
+                    let finalStatus = 'Unknown';
+
+                    if (typeof rawStatus === 'number') {
+                        // Enum: 1=Stopped, 2=StartPending, 3=StopPending, 4=Running, 5=ContinuePending, 6=PausePending, 7=Paused
+                        finalStatus = rawStatus === 4 ? 'Running' : 'Stopped';
+                    } else {
+                        const s = String(rawStatus || '').toLowerCase();
+
+                        if (
+                            s.includes('running') ||
+                            s.includes('startpending') ||
+                            s.includes('continuepending')
+                        ) {
+                            finalStatus = 'Running';
+                        } else if (
+                            s.includes('stopped') ||
+                            s.includes('stoppending') ||
+                            s.includes('pausepending') ||
+                            s.includes('paused')
+                        ) {
+                            finalStatus = 'Stopped';
+                        }
+                    }
+
+                    map.set(item.Name, finalStatus);
+                }
+
+                resolve(map);
+            } catch {
+                resolve(new Map());
+            }
+        });
+    });
+}
+
 // Middleware
 console.log('[5] Configurando middlewares');
 app.use(express.json());
@@ -254,8 +314,16 @@ app.get('/api/monitored-services', async (req, res) => {
         const servicesPath = path.join(__dirname, 'services.json');
         const data = await fs.readFile(servicesPath, 'utf-8');
         const config = JSON.parse(data);
-        
-        res.json(config.services || []);
+
+        const services = config.services || [];
+        const statusMap = await getServicesStatusMap(services.map(s => s.name));
+
+        const withStatus = services.map(s => ({
+            ...s,
+            status: statusMap.get(s.name) || 'Unknown'
+        }));
+
+        res.json(withStatus);
     } catch (error) {
         logger.error('Erro ao carregar services.json:', error.message);
         res.status(500).json({ error: error.message });

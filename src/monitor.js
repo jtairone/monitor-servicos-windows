@@ -5,30 +5,36 @@ const fs = require('fs').promises;
 const path = require('path');
 const logger = require('./logger');
 const {sendDiscordNotification, hook } = require('./sendNotification');
-// Configurações
-const CONFIG = require('../services.json');
+// Configurações (carregadas dinamicamente do services.json)
+const SERVICES_JSON_PATH = path.join(__dirname, '..', 'services.json');
 
 class ServiceMonitor {
     constructor() {
         this.services = [];
         this.serviceStatus = new Map();
         this.retryCount = new Map();
+        this.config = { monitoring: { checkInterval: 30000, maxRetries: 3 }, discord: {} };
     }
 
     async loadServices() {
         try {
-            this.services = CONFIG.services || [];
+            const raw = await fs.readFile(SERVICES_JSON_PATH, 'utf8');
+            this.config = JSON.parse(raw);
+
+            this.services = this.config.services || [];
             if (this.services.length === 0) {
                 throw new Error('Nenhum serviço configurado no services.json');
             }
             
             logger.info(`Carregados ${this.services.length} serviços para monitoramento`);
-            logger.info(`Webhook URL: ${CONFIG.discord.webhookUrl.substring(0, 50)}...`);
+            if (this.config?.discord?.webhookUrl) {
+                logger.info(`Webhook URL: ${this.config.discord.webhookUrl.substring(0, 50)}...`);
+            }
             
             // Inicializar status
             for (const service of this.services) {
-                this.serviceStatus.set(service.name, null);
-                this.retryCount.set(service.name, 0);
+                if (!this.serviceStatus.has(service.name)) this.serviceStatus.set(service.name, null);
+                if (!this.retryCount.has(service.name)) this.retryCount.set(service.name, 0);
             }
             
         } catch (error) {
@@ -195,9 +201,9 @@ if %ERRORLEVEL% equ 0 (
                     const retries = this.retryCount.get(serviceConfig.name) + 1;
                     this.retryCount.set(serviceConfig.name, retries);
                     
-                    logger.warn(`🔴 Serviço ${serviceConfig.name} PAROU! Tentativa ${retries}/${CONFIG.monitoring.maxRetries}`);
+                    logger.warn(`🔴 Serviço ${serviceConfig.name} PAROU! Tentativa ${retries}/${this.config.monitoring.maxRetries}`);
                     
-                    if (retries <= CONFIG.monitoring.maxRetries) {
+                    if (retries <= this.config.monitoring.maxRetries) {
                         logger.info(`🔄 Tentando reiniciar ${serviceConfig.name}...`);
                         const success = await this.attemptRestart(serviceConfig.name, serviceConfig.displayName);
                         
@@ -255,7 +261,7 @@ if %ERRORLEVEL% equ 0 (
             }
             
             logger.info(`Iniciando monitoramento de ${this.services.length} serviços`);
-            logger.info(`Intervalo de verificação: ${CONFIG.monitoring.checkInterval / 1000} segundos`);
+            logger.info(`Intervalo de verificação: ${this.config.monitoring.checkInterval / 1000} segundos`);
             
             // Verificar todos os serviços imediatamente
             logger.info('▶️  Executando primeira verificação...');
@@ -263,19 +269,33 @@ if %ERRORLEVEL% equ 0 (
                 await this.monitorService(service);
             }
             
-            // Configurar intervalo de verificação
+            // Loop de verificação com intervalo dinâmico (lê do services.json a cada ciclo)
             let checkCount = 0;
-            setInterval(async () => {
+            const loop = async () => {
                 checkCount++;
                 const timestamp = new Date().toLocaleTimeString('pt-BR');
                 logger.info(`\n📍 VERIFICAÇÃO #${checkCount} - ${timestamp}`);
+
+                // Recarregar services.json a cada ciclo (sem precisar reiniciar)
+                // Isso permite alterar restartOnFailure / lista de serviços / checkInterval em tempo real.
+                try {
+                    await this.loadServices();
+                } catch (e) {
+                    logger.error('Erro ao recarregar services.json:', e.message);
+                }
                 
                 for (const service of this.services) {
                     await this.monitorService(service);
                 }
                 
                 logger.info(`✅ Verificação #${checkCount} concluída\n`);
-            }, CONFIG.monitoring.checkInterval);
+
+                const interval = this.config?.monitoring?.checkInterval || 30000;
+                setTimeout(loop, interval);
+            };
+
+            // Inicia o loop dinâmico
+            setTimeout(loop, this.config.monitoring.checkInterval);
             
             logger.info('Monitor em execução. Pressione Ctrl+C para parar.');
             
