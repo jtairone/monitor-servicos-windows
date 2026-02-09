@@ -329,7 +329,7 @@ function renderServicesList(services) {
             <div class="service-description">${displayName}</div>
             <div class="service-actions">
                 ${isRunning
-                    ? `<button class="btn btn-sm btn-danger" onclick="stopService('${name}')">
+                    ? `<button class="btn btn-sm btn-secondary" onclick="stopService('${name}')">
                         <i class="fas fa-stop"></i> Parar
                       </button>`
                     : `<button class="btn btn-sm btn-success" onclick="startService('${name}')">
@@ -512,7 +512,7 @@ function renderMonitoredServices(services) {
             <div class="service-description">${displayName}</div>
             <div class="service-actions">
                 ${isRunning
-                    ? `<button class="btn btn-sm btn-danger" onclick="stopService('${name}')">
+                    ? `<button class="btn btn-sm btn-secondary" onclick="stopService('${name}')">
                         <i class="fas fa-stop"></i> Parar
                       </button>`
                     : `<button class="btn btn-sm btn-success" onclick="startService('${name}')">
