@@ -997,6 +997,7 @@ textarea:focus {
 .app-footer {
     margin-top: auto; /* Empurra o footer para o final do container flex */
     text-align: center;
+    font-size: small;
 }
 
 .app-footer .footer-brand {
