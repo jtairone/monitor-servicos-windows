@@ -45,9 +45,12 @@
                     <div class="user-role">Administrador</div>
                 </div>
             </div>
-            <button class="btn-logout" id="logoutBtn" title="Fazer logout">
+            <!-- <button class="btn-logout" id="logoutBtn" title="Fazer logout">
                 <i class="fas fa-sign-out-alt"></i>
-            </button>
+            </button> -->
+            <a class="btn-logout" href="javascript:void(0)" onclick="showModal('logoutModal')" title="Fazer logout">
+                <i class="fas fa-sign-out-alt"></i>    
+            </a>
         </div>
     </aside>
 
@@ -230,6 +233,36 @@
             <p id="loadingText">Processando requisição...</p>
         </div>
     </div>
+
+    <!-- MODAL: LOGOUT CONFIRMATION -->
+    <div class="modal-overlay" id="logoutModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3 id="logoutTitle">Encerrar Sessão?</h3>
+            <button class="modal-close" onclick="closeModal('logoutModal')">&times;</button>
+        </div>
+        
+        <div class="modal-body">
+            <div class="logout-alert-box">
+                <i class="fas fa-exclamation-circle"></i>
+                <div class="alert-content">
+                    <p class="alert-title">Atenção!</p>
+                    <p class="alert-text">Todos os dados não salvos serão perdidos.</p>
+                </div>
+            </div>
+            <p class="modal-main-question">Tem certeza que deseja continuar?</p>
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('logoutModal')">Cancelar</button>
+            <a class="btn btn-danger" onclick="logout()" style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center;">
+                Sair da Sessão
+            </a>
+        </div>
+    </div>
+</div>
+
+
     <script src="js/sweetalert2.js"></script>
     <script src="js/script.js"></script>
 </body>

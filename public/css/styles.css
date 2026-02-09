@@ -1003,3 +1003,44 @@ textarea:focus {
     font-style: italic;
     font-weight: bold;
 }
+
+/* Estilo do Alerta dentro do Modal */
+.logout-alert-box {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding: 15px;
+    border-radius: 10px;
+    /* No modo claro, usa um fundo amarelo suave */
+    background-color: rgba(245, 158, 11, 0.15); 
+    border: 1px solid var(--warning);
+}
+
+.logout-alert-box i {
+    color: var(--warning);
+    font-size: 1.5rem;
+}
+
+.alert-title {
+    font-weight: 700;
+    color: var(--warning); /* Cor de destaque */
+    margin: 0;
+}
+
+.alert-text {
+    font-size: 0.9rem;
+    /* Usa a variável de texto que muda conforme o tema */
+    color: var(--text-dark); 
+    margin: 0;
+}
+
+.modal-main-question {
+    color: var(--text-dark);
+    font-weight: 500;
+}
+
+/* Ajuste específico para Dark Mode se necessário */
+body.dark-mode .logout-alert-box {
+    background-color: rgba(245, 158, 11, 0.1); /* Um pouco mais escuro no dark mode */
+}
