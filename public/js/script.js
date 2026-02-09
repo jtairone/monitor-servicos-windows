@@ -1,433 +1,653 @@
 // ==========================================
-// SELETORES DOM
+// VARIÁVEIS GLOBAIS
 // ==========================================
 
-// Dash Stats
-const statTotal = document.getElementById('stat-total');
-const statRunning = document.getElementById('stat-running');
-
-// Discover Tab
-const discoverBtn = document.getElementById('discoverBtn');
-const servicesList = document.getElementById('servicesList');
-const searchInput = document.getElementById('searchInput');
-const statusFilter = document.getElementById('statusFilter');
-const filterSection = document.getElementById('filterSection');
-
-// Monitored Tab
-const refreshMonitoredBtn = document.getElementById('refreshMonitoredBtn');
-const monitoredList = document.getElementById('monitoredList');
-
-// Settings Tab
-const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-const cfgInterval = document.getElementById('cfg-interval');
-const msValue = document.getElementById('ms-value');
-const secValue = document.getElementById('sec-value');
-
-// Global UI
-const loadingModal = document.getElementById('loadingModal');
-const loadingText = document.getElementById('loadingText');
-
-// Variáveis de estado
-let allDiscoveredServices = [];
-let allMonitoredServices = [];
+const API_BASE = '';
+let currentUser = null;
+let allServices = [];
+let monitoredServices = [];
+let allAuditLogs = [];
 
 // ==========================================
-// EVENT LISTENERS
+// INICIALIZAÇÃO
 // ==========================================
 
-discoverBtn.addEventListener('click', discoverServices);
-refreshMonitoredBtn.addEventListener('click', loadMonitoredServices);
-searchInput.addEventListener('input', filterServices);
-statusFilter.addEventListener('change', filterServices);
-saveSettingsBtn.addEventListener('click', saveSettings);
-
-// Escuta a digitação no campo de intervalo para atualizar a legenda em tempo real
-cfgInterval.addEventListener('input', updateIntervalHelper);
-
-// Navegação de Abas (Tabs)
-document.querySelectorAll('.nav-item').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const tabName = btn.getAttribute('data-tab');
-        
-        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-
-        btn.classList.add('active');
-        document.getElementById(tabName).classList.add('active');
-
-        if (tabName === 'monitored') loadMonitoredServices();
-        if (tabName === 'settings') loadSettings();
-    });
+document.addEventListener('DOMContentLoaded', async () => {
+    initTheme();
+    await verifyToken();
+    setupEventListeners();
+    await loadAuditLogs(); // Carregar logs de auditoria na inicialização
 });
 
 // ==========================================
-// FUNÇÕES UTILITÁRIAS
+// AUTENTICAÇÃO E VERIFICAÇÃO DE TOKEN
 // ==========================================
 
-// Atualiza o texto de ajuda (ms para segundos)
-function updateIntervalHelper() {
-    const ms = parseInt(cfgInterval.value) || 0;
-    const sec = (ms / 1000).toFixed(1);
+async function verifyToken() {
+    const token = localStorage.getItem('token');
     
-    if(msValue) msValue.textContent = ms;
-    if(secValue) secValue.textContent = sec;
+    if (!token) {
+        window.location.href = '/login';
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/verify-token`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        }
+
+        const user = localStorage.getItem('user');
+        if (user) {
+            currentUser = JSON.parse(user);
+            document.getElementById('userName').textContent = currentUser.username;
+        }
+    } catch (error) {
+        console.error('Token verification error:', error);
+        window.location.href = '/login';
+    }
 }
 
-function showLoading(text = 'Processando...') {
-    loadingText.textContent = text;
-    loadingModal.classList.add('show');
+function getAuthHeader() {
+    const token = localStorage.getItem('token');
+    return { 'Authorization': `Bearer ${token}` };
+}
+
+// ==========================================
+// DARK MODE / THEME
+// ==========================================
+
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.body.className = savedTheme === 'dark' ? 'dark-mode' : '';
+    updateThemeIcon(savedTheme === 'dark');
+}
+
+function updateThemeIcon(isDark) {
+    const icon = document.querySelector('#themeToggle i');
+    if (icon) {
+        icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+    }
+}
+
+// ==========================================
+// TOAST NOTIFICATIONS
+// ==========================================
+
+function showToast(message, type = 'info', duration = 3000) {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    const icons = {
+        success: 'fas fa-check-circle',
+        error: 'fas fa-exclamation-circle',
+        warning: 'fas fa-exclamation-triangle',
+        info: 'fas fa-info-circle'
+    };
+
+    toast.innerHTML = `
+        <i class="${icons[type] || icons.info}"></i>
+        <span class="toast-message">${message}</span>
+    `;
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.add('hide');
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+}
+
+// ==========================================
+// MODAL FUNCTIONS
+// ==========================================
+
+function showModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.add('show');
+    }
+}
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.remove('show');
+    }
+}
+
+function showConfirmation(title, message, onConfirm) {
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMessage').textContent = message;
+    
+    const confirmBtn = document.getElementById('confirmBtn');
+    confirmBtn.onclick = () => {
+        closeModal('confirmationModal');
+        onConfirm();
+    };
+
+    showModal('confirmationModal');
+}
+
+function showLoading(text = 'Processando requisição...') {
+    document.getElementById('loadingText').textContent = text;
+    document.getElementById('loadingModal').classList.add('show');
 }
 
 function hideLoading() {
-    loadingModal.classList.remove('show');
+    document.getElementById('loadingModal').classList.remove('show');
 }
 
-// SweetAlert2 configurado
-function showMessage(message, type = 'info') {
-    Swal.fire({
-        toast: true,
-        position: "top-end",
-        icon: type,
-        title: message,
-        showConfirmButton: false,
-        timer: 3000,
-        timerProgressBar: true
+// ==========================================
+// EVENT LISTENERS SETUP
+// ==========================================
+
+function setupEventListeners() {
+    // Theme toggle
+    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+    // Tab navigation
+    document.querySelectorAll('.nav-item').forEach(btn => {
+        btn.addEventListener('click', switchTab);
+    });
+
+    // Discover tab
+    document.getElementById('discoverBtn').addEventListener('click', discoverServices);
+
+    // Monitored tab
+    document.getElementById('refreshMonitoredBtn').addEventListener('click', loadMonitoredServices);
+
+    // Audit tab
+    document.getElementById('refreshAuditBtn').addEventListener('click', loadAuditLogs);
+
+    // Settings tab
+    document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+
+    // Search filters
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', filterServices);
+    }
+
+    const statusFilter = document.getElementById('statusFilter');
+    if (statusFilter) {
+        statusFilter.addEventListener('change', filterServices);
+    }
+
+    const auditSearchInput = document.getElementById('auditSearchInput');
+    if (auditSearchInput) {
+        auditSearchInput.addEventListener('input', filterAuditLogs);
+    }
+
+    // Modal close buttons
+    document.querySelectorAll('.modal-close').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.target.closest('.modal-overlay').classList.remove('show');
+        });
+    });
+
+    // Close modal on overlay click
+    document.querySelectorAll('.modal-overlay').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.classList.remove('show');
+        });
     });
 }
 
-function updateTopStats(services) {
-    statTotal.textContent = services.length;
-    statRunning.textContent = services.filter(s => s.status === 'Running').length;
+// ==========================================
+// THEME TOGGLE
+// ==========================================
+
+function toggleTheme() {
+    const isDark = document.body.classList.toggle('dark-mode');
+    const theme = isDark ? 'dark' : 'light';
+    localStorage.setItem('theme', theme);
+    updateThemeIcon(isDark);
 }
 
 // ==========================================
-// LÓGICA DE DESCOBERTA (DISCOVER)
+// TAB NAVIGATION
+// ==========================================
+
+function switchTab(e) {
+    const tabName = e.currentTarget.dataset.tab;
+    
+    // Update nav items
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    e.currentTarget.classList.add('active');
+
+    // Update tab panes
+    document.querySelectorAll('.tab-pane').forEach(pane => {
+        pane.classList.remove('active');
+    });
+    document.getElementById(tabName).classList.add('active');
+
+    // Load data for specific tabs
+    if (tabName === 'discover') {
+        discoverServices();
+    } else if (tabName === 'audit') {
+        loadAuditLogs();
+    } else if (tabName === 'monitored') {
+        loadMonitoredServices();
+    }
+}
+
+// ==========================================
+// SERVICES DISCOVERY
 // ==========================================
 
 async function discoverServices() {
-    showLoading('Lendo serviços do Windows...');
     try {
-        const response = await fetch('/api/discover-services', { method: 'POST' });
+        showLoading('Descobrindo serviços do Windows...');
+        
+        const response = await fetch(`${API_BASE}/api/discover-services`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeader()
+            }
+        });
+
+        if (!response.ok) throw new Error('Erro ao descobrir serviços');
+
         const data = await response.json();
-
-        if (!response.ok) throw new Error(data.error);
-
-        allDiscoveredServices = data.services;
-        updateTopStats(allDiscoveredServices);
-        filterSection.style.display = 'flex';
-        renderDiscoveredServices(allDiscoveredServices);
-        showMessage(`✅ ${data.count} serviços encontrados!`, 'success');
-    } catch (error) {
-        showMessage(`❌ Erro: ${error.message}`, 'error');
-    } finally {
+        allServices = data.services || [];
+        
+        renderServicesList(allServices);
+        updateStats();
+        document.getElementById('filterSection').style.display = 'flex';
+        
         hideLoading();
+        showToast(`${allServices.length} serviços descobertos com sucesso`, 'success');
+    } catch (error) {
+        hideLoading();
+        showToast(error.message, 'error');
+        console.error(error);
     }
 }
 
-function renderDiscoveredServices(services) {
-    if (services.length === 0) {
-        servicesList.innerHTML = `<div class="empty-state"><h3>Nenhum serviço encontrado</h3></div>`;
+function renderServicesList(services) {
+    const container = document.getElementById('servicesList');
+    
+    if (!services || services.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--text-light); padding: 40px;">Nenhum serviço encontrado</p>';
         return;
     }
-    servicesList.innerHTML = services.map(service => `
-        <div class="service-item" data-service-name="${service.name}">
-            <div class="service-info">
-                <div class="service-name">${service.name}</div>
-                <div class="service-display">${service.displayName}</div>
-                <span class="status-pill ${service.status === 'Running' ? 'running' : 'stopped'}">
-                    ${service.status === 'Running' ? '● Rodando' : '○ Parado'}
+
+    container.innerHTML = services.map(service => `
+        <div class="service-card">
+            <div class="service-header">
+                <div class="service-name">${service.Name}</div>
+                <span class="service-status ${service.State === 'Running' ? 'status-running' : 'status-stopped'}">
+                    ${service.State === 'Running' ? 'Rodando' : 'Parado'}
                 </span>
             </div>
-            <div class="service-controls" style="margin-top:15px; display:flex; justify-content:space-between; align-items:center;">
-                <label class="toggle-switch">
-                    <input type="checkbox" class="restart-toggle" checked title="Auto-restart">
-                    <span class="slider">Auto-restart</span>
-                </label>
-                <button class="btn btn-primary" onclick="addMonitoredService('${service.name}', '${service.displayName}', this)">
+            <div class="service-description">${service.DisplayName || 'Sem descrição'}</div>
+            <div class="service-actions">
+                ${service.State === 'Running' 
+                    ? `<button class="btn btn-sm btn-danger" onclick="stopService('${service.Name}')">
+                        <i class="fas fa-stop"></i> Parar
+                      </button>`
+                    : `<button class="btn btn-sm btn-success" onclick="startService('${service.Name}')">
+                        <i class="fas fa-play"></i> Iniciar
+                      </button>`
+                }
+                <button class="btn btn-sm btn-warning" onclick="restartService('${service.Name}')">
+                    <i class="fas fa-sync"></i> Reiniciar
+                </button>
+                <button class="btn btn-sm btn-primary" onclick="addToMonitored('${service.Name}', '${service.DisplayName}')">
                     <i class="fas fa-plus"></i> Monitorar
-                </button>
-            </div>
-            <div class="action-buttons" style="margin-top:15px; display:flex; gap:10px; justify-content: center">
-                <button class="btn btn-success btn-sm" ${service.status === 'Running' ? 'disabled': ''} onclick="startService('${service.name}')">
-                    <i class="fas fa-play"></i> Start
-                </button>
-                <button class="btn btn-danger btn-sm" ${service.status !== 'Running' ? 'disabled': ''} onclick="stopService('${service.name}')">
-                    <i class="fas fa-stop"></i> Stop
-                </button>
-                <button class="btn btn-warning btn-sm" ${service.status !== 'Running' ? 'disabled': ''} onclick="restartService('${service.name}')">
-                    <i class="fas fa-redo"></i> Reiniciar
                 </button>
             </div>
         </div>
     `).join('');
 }
 
-function filterServices() {
-    const term = searchInput.value.toLowerCase();
-    const status = statusFilter.value;
-    const filtered = allDiscoveredServices.filter(s => 
-        (s.name.toLowerCase().includes(term) || s.displayName.toLowerCase().includes(term)) &&
-        (!status || s.status === status)
+// ==========================================
+// SERVICE ACTIONS
+// ==========================================
+
+function startService(serviceName) {
+    showConfirmation(
+        'Iniciar Serviço',
+        `Deseja iniciar o serviço "${serviceName}"?`,
+        async () => {
+            await executeServiceAction(serviceName, 'start');
+        }
     );
-    renderDiscoveredServices(filtered);
 }
 
-// ==========================================
-// LÓGICA DE MONITORAMENTO (MONITORED)
-// ==========================================
+function stopService(serviceName) {
+    showConfirmation(
+        'Parar Serviço',
+        `Deseja parar o serviço "${serviceName}"?`,
+        async () => {
+            await executeServiceAction(serviceName, 'stop');
+        }
+    );
+}
 
-async function addMonitoredService(name, displayName, button) {
-    const item = document.querySelector(`[data-service-name="${name}"]`);
-    const restartOnFailure = item.querySelector('.restart-toggle').checked;
+function restartService(serviceName) {
+    showConfirmation(
+        'Reiniciar Serviço',
+        `Deseja reiniciar o serviço "${serviceName}"?`,
+        async () => {
+            await executeServiceAction(serviceName, 'restart');
+        }
+    );
+}
 
-    button.disabled = true;
-    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Aguarde';
-
+async function executeServiceAction(serviceName, action) {
     try {
-        const response = await fetch('/api/add-monitored-service', {
+        showLoading(`${action === 'start' ? 'Iniciando' : action === 'stop' ? 'Parando' : 'Reiniciando'} serviço...`);
+        
+        const response = await fetch(`${API_BASE}/api/service/${action}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, displayName, restartOnFailure })
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeader()
+            },
+            body: JSON.stringify({ serviceName })
         });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error);
 
-        showMessage(`📌 ${name} monitorado!`, 'success');
-        item.style.opacity = '0.4';
-        button.innerHTML = '<i class="fas fa-check"></i> Ativo';
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || `Erro ao ${action} o serviço`);
+        }
+
+        hideLoading();
+        const actionText = action === 'start' ? 'iniciado' : action === 'stop' ? 'parado' : 'reiniciado';
+        showToast(`Serviço ${actionText} com sucesso!`, 'success');
+        await loadServices();
     } catch (error) {
-        showMessage(`❌ Erro: ${error.message}`, 'error');
-        button.disabled = false;
-        button.innerHTML = '<i class="fas fa-plus"></i> Monitorar';
+        hideLoading();
+        showToast(error.message, 'error');
     }
 }
 
-async function loadMonitoredServices() {
-    showLoading('Atualizando lista...');
+async function addToMonitored(serviceName, displayName) {
     try {
-        const response = await fetch('/api/monitored-services');
-        const data = await response.json();
-        allMonitoredServices = data;
+        showLoading('Adicionando serviço ao monitoramento...');
+        
+        const response = await fetch(`${API_BASE}/api/add-service`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeader()
+            },
+            body: JSON.stringify({
+                name: serviceName,
+                displayName: displayName
+            })
+        });
 
-        renderMonitoredServices(allMonitoredServices);
-    } catch (error) {
-        showMessage('Erro ao carregar monitorados', 'error');
-    } finally {
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Erro ao adicionar serviço');
+        }
+
         hideLoading();
+        showToast('Serviço adicionado ao monitoramento!', 'success');
+        await loadServices();
+    } catch (error) {
+        hideLoading();
+        showToast(error.message, 'error');
+    }
+}
+
+// ==========================================
+// MONITORED SERVICES
+// ==========================================
+
+async function loadMonitoredServices() {
+    try {
+        const response = await fetch(`${API_BASE}/api/list-services`, {
+            headers: getAuthHeader()
+        });
+
+        if (!response.ok) throw new Error('Erro ao carregar serviços monitorados');
+
+        const data = await response.json();
+        monitoredServices = data.services || [];
+        
+        renderMonitoredServices(monitoredServices);
+    } catch (error) {
+        showToast(error.message, 'error');
+        console.error(error);
     }
 }
 
 function renderMonitoredServices(services) {
-    if (services.length === 0) {
-        monitoredList.innerHTML = `<div class="empty-state"><h3>Sem serviços monitorados</h3></div>`;
+    const container = document.getElementById('monitoredList');
+    
+    if (!services || services.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--text-light); padding: 40px;">Nenhum serviço sendo monitorado</p>';
         return;
     }
-    monitoredList.innerHTML = services.map(s => {
-        const isRunning = (s.status || 'Running') === 'Running';
 
-        return `
-        <div class="service-item">
-            <div class="service-info">
-                <div class="service-name" style="color:var(--primary)">${s.name}</div>
-                <div class="service-display">${s.displayName}</div>
-                <div style="font-size:0.75rem; margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-                    <span class="status-pill ${isRunning ? 'running' : 'stopped'}">
-                        ${isRunning ? '● Rodando' : '○ Parado'}
-                    </span>
-                    <span class="status-pill running">PROTEGIDO</span>
-                    ${s.restartOnFailure ? '<span class="status-pill running">AUTO-RESTART</span>' : ''}
-                </div>
+    container.innerHTML = services.map(service => `
+        <div class="service-card">
+            <div class="service-header">
+                <div class="service-name">${service.name}</div>
+                <span class="service-status ${service.status === 'running' ? 'status-running' : 'status-stopped'}">
+                    ${service.status === 'running' ? 'Rodando' : 'Parado'}
+                </span>
             </div>
-            <button class="btn btn-outline" style="margin-top:15px; width:100%; color: var(--danger)" onclick="removeMonitoredService('${s.name}', this)">
-                <i class="fas fa-trash-alt"></i> Remover
-            </button>
-            <div class="action-buttons" style="margin-top:10px; display:flex; gap:8px;">
-                <button class="btn btn-success btn-sm" ${isRunning ? 'disabled': ''} onclick="startService('${s.name}')">
-                    <i class="fas fa-play"></i> Start
-                </button>
-                <button class="btn btn-danger btn-sm" ${!isRunning ? 'disabled': ''} onclick="stopService('${s.name}')">
-                    <i class="fas fa-stop"></i> Stop
-                </button>
-                <button class="btn btn-warning btn-sm" ${!isRunning ? 'disabled': ''} onclick="restartService('${s.name}')">
-                    <i class="fas fa-redo"></i> Reiniciar
+            <div class="service-description">${service.displayName || 'Sem descrição'}</div>
+            <div class="service-actions">
+                ${service.status === 'running' 
+                    ? `<button class="btn btn-sm btn-danger" onclick="stopService('${service.name}')">
+                        <i class="fas fa-stop"></i> Parar
+                      </button>`
+                    : `<button class="btn btn-sm btn-success" onclick="startService('${service.name}')">
+                        <i class="fas fa-play"></i> Iniciar
+                      </button>`
+                }
+                <button class="btn btn-sm btn-danger" onclick="removeMonitored('${service.name}')">
+                    <i class="fas fa-trash"></i> Remover
                 </button>
             </div>
         </div>
-    `}).join('');
+    `).join('');
 }
 
-async function startService(name) {
-    try {
-        const response = await fetch(`/api/startservice/${name}`, { method: 'POST' });
-        const data = await response.json();
+async function removeMonitored(serviceName) {
+    showConfirmation(
+        'Remover Monitoramento',
+        `Deseja remover o serviço "${serviceName}" do monitoramento?`,
+        async () => {
+            try {
+                showLoading('Removendo serviço...');
+                
+                const response = await fetch(`${API_BASE}/api/remove-service`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeader()
+                    },
+                    body: JSON.stringify({ name: serviceName })
+                });
 
-        if (!response.ok || !data.success) {
-            throw new Error(data.message || 'Falha ao iniciar serviço');
+                if (!response.ok) throw new Error('Erro ao remover serviço');
+
+                hideLoading();
+                showToast('Serviço removido do monitoramento!', 'success');
+                await loadMonitoredServices();
+            } catch (error) {
+                hideLoading();
+                showToast(error.message, 'error');
+            }
         }
-
-        // Atualiza status na lista de descobertos (memória)
-        allDiscoveredServices = allDiscoveredServices.map(s =>
-            s.name === name ? { ...s, status: 'Running' } : s
-        );
-        updateTopStats(allDiscoveredServices);
-        filterServices(); // re-renderiza respeitando filtros atuais
-
-        // Atualiza status na lista de monitorados (apenas em memória)
-        allMonitoredServices = allMonitoredServices.map(s =>
-            s.name === name ? { ...s, status: 'Running' } : s
-        );
-        renderMonitoredServices(allMonitoredServices);
-
-        showMessage(data.message || `Serviço ${name} iniciado`, 'success');
-    } catch (error) {
-        showMessage(`Erro ao iniciar ${name}: ${error.message}`, 'error');
-    }
-}
-
-async function stopService(name) {
-    try {
-        const response = await fetch(`/api/stopservice/${name}`, { method: 'POST' });
-        const data = await response.json();
-
-        if (!response.ok || !data.success) {
-            throw new Error(data.message || 'Falha ao parar serviço');
-        }
-
-        // Atualiza status na lista de descobertos
-        allDiscoveredServices = allDiscoveredServices.map(s =>
-            s.name === name ? { ...s, status: 'Stopped' } : s
-        );
-        updateTopStats(allDiscoveredServices);
-        filterServices();
-
-        // Atualiza status na lista de monitorados (apenas em memória)
-        allMonitoredServices = allMonitoredServices.map(s =>
-            s.name === name ? { ...s, status: 'Stopped' } : s
-        );
-        renderMonitoredServices(allMonitoredServices);
-
-        showMessage(data.message || `Serviço ${name} parado`, 'success');
-    } catch (error) {
-        showMessage(`Erro ao parar ${name}: ${error.message}`, 'error');
-    }
-}
-
-async function restartService(name) {
-    try {
-        const response = await fetch(`/api/restartservice/${name}`, { method: 'POST' });
-        const data = await response.json();
-
-        if (!response.ok || !data.success) {
-            throw new Error(data.message || 'Falha ao reiniciar serviço');
-        }
-
-        // Após reiniciar, assumimos Running se o backend retornou sucesso
-        allDiscoveredServices = allDiscoveredServices.map(s =>
-            s.name === name ? { ...s, status: 'Running' } : s
-        );
-        updateTopStats(allDiscoveredServices);
-        filterServices();
-
-        // Atualiza status na lista de monitorados (apenas em memória)
-        allMonitoredServices = allMonitoredServices.map(s =>
-            s.name === name ? { ...s, status: 'Running' } : s
-        );
-        renderMonitoredServices(allMonitoredServices);
-
-        showMessage(data.message || `Serviço ${name} reiniciado`, 'success');
-    } catch (error) {
-        showMessage(`Erro ao reiniciar ${name}: ${error.message}`, 'error');
-    }
-}
-
-async function removeMonitoredService(name, button) {
-    const result = await Swal.fire({
-        title: 'Tem certeza?',
-        text: `Parar monitoramento de ${name}?`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#2563eb',
-        cancelButtonColor: '#ef4444',
-        confirmButtonText: 'Sim, remover!',
-        cancelButtonText: 'Cancelar'
-    });
-
-    if (result.isConfirmed) {
-        try {
-            await fetch(`/api/monitored-services/${name}`, { method: 'DELETE' });
-            loadMonitoredServices();
-            showMessage('Removido com sucesso', 'success');
-        } catch (e) { 
-            showMessage('Erro ao remover', 'error');
-        }
-    }
+    );
 }
 
 // ==========================================
-// LÓGICA DE CONFIGURAÇÕES (SETTINGS)
+// AUDIT LOGS
 // ==========================================
 
-async function loadSettings() {
-    showLoading('Lendo configurações...');
+async function loadAuditLogs() {
     try {
-        const response = await fetch('/api/settings');
+        const response = await fetch(`${API_BASE}/api/audit-logs`, {
+            headers: getAuthHeader()
+        });
+
+        if (!response.ok) throw new Error('Erro ao carregar logs de auditoria');
+
         const data = await response.json();
-
-        // Preenche os campos
-        document.getElementById('cfg-port').value = data.servidor?.port || 3000;
-        document.getElementById('cfg-interval').value = data.monitoring?.checkInterval || 30000;
-        document.getElementById('cfg-discord-url').value = data.discord?.webhookUrl || '';
-        document.getElementById('cfg-discord-startup').checked = data.discord?.sendStartupMessage || false;
-
-        // IMPORTANTE: Atualiza a legenda ms/s logo após carregar os valores
-        updateIntervalHelper();
-
+        allAuditLogs = data.logs || [];
+        
+        renderAuditLogs(allAuditLogs);
     } catch (error) {
-        showMessage('Erro ao carregar configurações', 'error');
-    } finally {
-        hideLoading();
+        showToast(error.message, 'error');
+        console.error(error);
     }
 }
 
-async function saveSettings() {
-    saveSettingsBtn.disabled = true;
-    saveSettingsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+function renderAuditLogs(logs) {
+    const container = document.getElementById('auditList');
+    
+    if (!logs || logs.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--text-light); padding: 40px;">Nenhum evento registrado</p>';
+        return;
+    }
 
-    const payload = {
-        servidor: { port: parseInt(document.getElementById('cfg-port').value) },
-        monitoring: {
-            checkInterval: parseInt(document.getElementById('cfg-interval').value),
-            maxRetries: 3,
-            logLevel: "info"
-        },
-        discord: {
-            webhookUrl: document.getElementById('cfg-discord-url').value,
-            sendStartupMessage: document.getElementById('cfg-discord-startup').checked,
-            notifyOnRecovery: true
-        }
+    const formatDate = (timestamp) => {
+        const date = new Date(timestamp);
+        return date.toLocaleString('pt-BR');
     };
 
+    const getStatusClass = (status) => {
+        if (status === 'failed') return 'failed';
+        if (status === 'logout') return 'logout';
+        return 'success';
+    };
+
+    container.innerHTML = logs.map(log => `
+        <div class="audit-item ${getStatusClass(log.status)}">
+            <div class="audit-info">
+                <div class="audit-action">
+                    <i class="fas fa-${getActionIcon(log.action)}"></i> ${log.action}
+                </div>
+                <div class="audit-user">${log.username}</div>
+                ${log.details ? `<div class="audit-user" style="margin-top: 4px;">${log.details}</div>` : ''}
+            </div>
+            <div class="audit-time">${formatDate(log.timestamp)}</div>
+        </div>
+    `).join('');
+}
+
+function filterAuditLogs() {
+    const searchTerm = document.getElementById('auditSearchInput').value.toLowerCase();
+    const filtered = allAuditLogs.filter(log => 
+        log.username.toLowerCase().includes(searchTerm) ||
+        log.action.toLowerCase().includes(searchTerm)
+    );
+    renderAuditLogs(filtered);
+}
+
+function getActionIcon(action) {
+    const icons = {
+        'LOGIN': 'sign-in-alt',
+        'LOGOUT': 'sign-out-alt',
+        'START': 'play',
+        'STOP': 'stop',
+        'RESTART': 'sync',
+        'ADD_SERVICE': 'plus',
+        'REMOVE_SERVICE': 'trash',
+        'DISCOVER_SERVICES': 'search',
+        'UPDATE_SETTINGS': 'cog'
+    };
+    return icons[action] || 'info-circle';
+}
+
+// ==========================================
+// SETTINGS
+// ==========================================
+
+async function saveSettings() {
     try {
-        const response = await fetch('/api/settings', {
+        const port = document.getElementById('cfg-port').value;
+        const interval = document.getElementById('cfg-interval').value;
+        const discordUrl = document.getElementById('cfg-discord-url').value;
+        const discordStartup = document.getElementById('cfg-discord-startup').checked;
+
+        showLoading('Salvando configurações...');
+
+        const response = await fetch(`${API_BASE}/api/update-settings`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeader()
+            },
+            body: JSON.stringify({
+                port: port ? parseInt(port) : undefined,
+                interval: interval ? parseInt(interval) : undefined,
+                discordWebhookUrl: discordUrl,
+                notifyOnStartup: discordStartup
+            })
         });
-        const result = await response.json();
-        
-        if (response.ok) {
-            showMessage(result.message, 'success');
-        } else {
-            throw new Error(result.error);
-        }
+
+        if (!response.ok) throw new Error('Erro ao salvar configurações');
+
+        hideLoading();
+        showToast('Configurações salvas com sucesso!', 'success');
     } catch (error) {
-        showMessage(`Erro ao salvar: ${error.message}`, 'error');
-    } finally {
-        saveSettingsBtn.disabled = false;
-        saveSettingsBtn.innerHTML = '<i class="fas fa-save"></i> Salvar Alterações';
+        hideLoading();
+        showToast(error.message, 'error');
     }
 }
 
-window.addEventListener('load', () => {
-    // Inicializar qualquer dado necessário
-});
+// ==========================================
+// UTILITIES
+// ==========================================
+
+function updateStats() {
+    const running = allServices.filter(s => s.State === 'Running').length;
+    const total = allServices.length;
+
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-running').textContent = running;
+}
+
+function filterServices() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const statusFilter = document.getElementById('statusFilter').value;
+
+    const filtered = allServices.filter(service => {
+        const matchesSearch = 
+            service.Name.toLowerCase().includes(searchTerm) ||
+            service.DisplayName.toLowerCase().includes(searchTerm);
+        
+        const matchesStatus = !statusFilter || service.State === statusFilter;
+
+        return matchesSearch && matchesStatus;
+    });
+
+    renderServicesList(filtered);
+}
+
+async function logout() {
+    try {
+        await fetch(`${API_BASE}/api/logout`, {
+            method: 'POST',
+            headers: getAuthHeader()
+        });
+    } catch (error) {
+        console.error('Logout error:', error);
+    } finally {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+    }
+}

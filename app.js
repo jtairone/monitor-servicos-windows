@@ -7,6 +7,9 @@ const fs_o = require('fs');
 const path = require('path');
 const os = require('os');
 const execAsync = promisify(exec);
+const rateLimit = require('express-rate-limit');
+const auth = require('./src/auth');
+const audit = require('./src/audit');
 
 console.log('🔍 Iniciando aplicação...');
 console.log('[1] Express carregado');
@@ -167,20 +170,72 @@ app.use(express.json());
 app.use(express.static('public'));
 console.log('[6] Middlewares configurados');
 
-// Rotas para servir arquivos estáticos
+// Rate limiting
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 5, // 5 tentativas
+    message: 'Muitas tentativas de login. Tente novamente em 15 minutos.'
+});
+
+const serviceLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minuto
+    max: 10, // 10 ações por minuto
+    message: 'Muitas ações. Tente novamente em um momento.'
+});
+
+// Rotas de autenticação
 console.log('[7] Configurando rotas');
-try {
-    app.get('/', (req, res) => {
-        res.sendFile(path.join(__dirname, 'public', 'index.html'));
-    });
-    console.log('[8] Rota GET / configurada');
-} catch (e) {
-    console.error('[ERRO na rota GET] :', e.message);
-}
+
+// Página de login
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// API de login
+app.post('/api/login', loginLimiter, async (req, res) => {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+        return res.status(400).json({ success: false, message: 'Usuário e senha são obrigatórios' });
+    }
+
+    const result = await auth.login(username, password);
+    await audit.logAction(username, 'LOGIN', { ip: req.ip }, result.success ? 'success' : 'failed');
+
+    if (result.success) {
+        return res.json(result);
+    }
+    return res.status(401).json(result);
+});
+
+// API de logout
+app.post('/api/logout', auth.authMiddleware, async (req, res) => {
+    await audit.logAction(req.user.username, 'LOGOUT', { ip: req.ip });
+    res.json({ success: true, message: 'Logout realizado com sucesso' });
+});
+
+// Verificar token
+app.get('/api/verify-token', (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+        return res.status(401).json({ valid: false });
+    }
+    const decoded = auth.verifyToken(token);
+    if (!decoded) {
+        return res.status(401).json({ valid: false });
+    }
+    res.json({ valid: true, user: decoded });
+});
+
+// Página principal
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+console.log('[8] Rota GET / configurada');
 
 // API: Descobrir serviços (rodar discover-services.js)
 try {
-    app.post('/api/discover-services', async (req, res) => {
+    app.post('/api/discover-services', auth.authMiddleware, async (req, res) => {
     try {
         logger.info('Iniciando descoberta de serviços...');
         
@@ -240,6 +295,7 @@ try {
                             services: processedServices,
                             count: processedServices.length 
                         });
+                        await audit.logAction(req.user.username, 'DISCOVER_SERVICES', { count: processedServices.length, ip: req.ip });
                         resolve();
                     } catch (parseError) {
                         logger.error('Erro ao processar resposta:', parseError.message);
@@ -262,7 +318,7 @@ try {
 }
 
 // Obter configurações completas (Discord, Monitoramento, Servidor)
-app.get('/api/settings', async (req, res) => {
+app.get('/api/settings', auth.authMiddleware, auth.adminMiddleware, async (req, res) => {
     try {
         const data = await fs.readFile(path.join(__dirname, 'services.json'), 'utf8');
         const fullConfig = JSON.parse(data);
@@ -275,7 +331,7 @@ app.get('/api/settings', async (req, res) => {
 });
 
 // Salvar configurações
-app.post('/api/settings', async (req, res) => {
+app.post('/api/settings', auth.authMiddleware, auth.adminMiddleware, async (req, res) => {
     try {
         const newSettings = req.body;
         const filePath = path.join(__dirname, 'services.json');
@@ -289,6 +345,7 @@ app.post('/api/settings', async (req, res) => {
         };
 
         await fs.writeFile(filePath, JSON.stringify(updatedConfig, null, 2));
+        await audit.logAction(req.user.username, 'UPDATE_SETTINGS', { settings: Object.keys(newSettings), ip: req.ip });
         res.json({ success: true, message: "Configurações salvas! Reinicie o servidor para aplicar os novos parâmetros." });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -296,7 +353,7 @@ app.post('/api/settings', async (req, res) => {
 });
 
 // API: Carregar discovered-services.json
-app.get('/api/discovered-services', async (req, res) => {
+app.get('/api/discovered-services', auth.authMiddleware, async (req, res) => {
     try {
         const discoveredPath = path.join(__dirname, './src/discovered-services.json');
         const data = await fs.readFile(discoveredPath, 'utf-8');
@@ -310,7 +367,7 @@ app.get('/api/discovered-services', async (req, res) => {
 });
 
 // API: Carregar services.json (serviços monitorados)
-app.get('/api/monitored-services', async (req, res) => {
+app.get('/api/monitored-services', auth.authMiddleware, async (req, res) => {
     try {
         const servicesPath = path.join(__dirname, 'services.json');
         const data = await fs.readFile(servicesPath, 'utf-8');
@@ -332,7 +389,7 @@ app.get('/api/monitored-services', async (req, res) => {
 });
 
 // API: Adicionar serviço ao monitoramento
-app.post('/api/add-monitored-service', async (req, res) => {
+app.post('/api/add-monitored-service', auth.authMiddleware, async (req, res) => {
     try {
         const { name, displayName, restartOnFailure } = req.body;
         
@@ -376,7 +433,7 @@ app.post('/api/add-monitored-service', async (req, res) => {
 });
 
 // API: Remover serviço do monitoramento
-app.delete('/api/monitored-services/:name', async (req, res) => {
+app.delete('/api/monitored-services/:name', auth.authMiddleware, async (req, res) => {
     try {
         const { name } = req.params;
         
@@ -399,7 +456,7 @@ app.delete('/api/monitored-services/:name', async (req, res) => {
     }
 });
 
-app.post('/api/startservice/:serviceName', async (req, res) => {
+app.post('/api/startservice/:serviceName', auth.authMiddleware, serviceLimiter, async (req, res) => {
     const { serviceName } = req.params;
     try {
         const result = await runServiceAction(serviceName, 'start');
@@ -418,7 +475,7 @@ app.post('/api/startservice/:serviceName', async (req, res) => {
     }
 });
 
-app.post('/api/stopservice/:serviceName', async (req, res) => {
+app.post('/api/stopservice/:serviceName', auth.authMiddleware, serviceLimiter, async (req, res) => {
     const { serviceName } = req.params;
     try {
         const result = await runServiceAction(serviceName, 'stop');
@@ -439,7 +496,7 @@ app.post('/api/stopservice/:serviceName', async (req, res) => {
     }
 });
 
-app.post('/api/restartservice/:serviceName', async (req, res) => {
+app.post('/api/restartservice/:serviceName', auth.authMiddleware, serviceLimiter, async (req, res) => {
     const { serviceName } = req.params;
     try {
         const result = await runServiceAction(serviceName, 'restart');
@@ -455,6 +512,170 @@ app.post('/api/restartservice/:serviceName', async (req, res) => {
             success: false, 
             message: `Erro ao reiniciar serviço: ${error.message}` 
         });
+    }
+});
+
+// AUDIT LOGS ENDPOINT
+app.get('/api/audit-logs', auth.authMiddleware, async (req, res) => {
+    try {
+        const logs = audit.getAuditLogs(500); // últimos 500 eventos
+        res.json({ logs });
+    } catch (error) {
+        logger.error(`Erro ao obter logs de auditoria: ${error.message}`);
+        res.status(500).json({
+            success: false,
+            message: 'Erro ao obter logs de auditoria'
+        });
+    }
+});
+
+// ALIAS ENDPOINTS (para compatibilidade com novo frontend Phase 2)
+// GET /api/list-services (alias para /api/monitored-services)
+app.get('/api/list-services', auth.authMiddleware, async (req, res) => {
+    try {
+        const servicesPath = path.join(__dirname, 'services.json');
+        const data = await fs.readFile(servicesPath, 'utf-8');
+        const config = JSON.parse(data);
+        const services = config.services || [];
+        const statusMap = await getServicesStatusMap(services.map(s => s.name));
+        
+        const withStatus = services.map(s => ({
+            ...s,
+            status: statusMap.get(s.name) || 'unknown'
+        }));
+        
+        res.json({ services: withStatus });
+    } catch (error) {
+        logger.error('Erro ao carregar services:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST /api/add-service (alias para /api/add-monitored-service)
+app.post('/api/add-service', auth.authMiddleware, async (req, res) => {
+    try {
+        const { name, displayName } = req.body;
+        
+        if (!name || !displayName) {
+            return res.status(400).json({ error: 'Nome e displayName são obrigatórios' });
+        }
+        
+        const servicesPath = path.join(__dirname, 'services.json');
+        const data = await fs.readFile(servicesPath, 'utf8');
+        const config = JSON.parse(data);
+        
+        if (!config.services) config.services = [];
+        
+        const exists = config.services.some(s => s.name === name);
+        if (exists) {
+            return res.status(400).json({ error: 'Serviço já está sendo monitorado' });
+        }
+        
+        config.services.push({ name, displayName, restartOnFailure: false });
+        await fs.writeFile(servicesPath, JSON.stringify(config, null, 2));
+        
+        audit.logAction(req.user.username, 'ADD_SERVICE', name, 'success');
+        
+        res.json({ success: true, message: 'Serviço adicionado com sucesso' });
+    } catch (error) {
+        audit.logAction(req.user?.username || 'unknown', 'ADD_SERVICE', '', 'failed');
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST /api/remove-service (novo)
+app.post('/api/remove-service', auth.authMiddleware, async (req, res) => {
+    try {
+        const { name } = req.body;
+        
+        if (!name) {
+            return res.status(400).json({ error: 'Nome do serviço é obrigatório' });
+        }
+        
+        const servicesPath = path.join(__dirname, 'services.json');
+        const data = await fs.readFile(servicesPath, 'utf8');
+        const config = JSON.parse(data);
+        
+        if (!config.services) config.services = [];
+        
+        config.services = config.services.filter(s => s.name !== name);
+        await fs.writeFile(servicesPath, JSON.stringify(config, null, 2));
+        
+        audit.logAction(req.user.username, 'REMOVE_SERVICE', name, 'success');
+        
+        res.json({ success: true, message: 'Serviço removido com sucesso' });
+    } catch (error) {
+        audit.logAction(req.user?.username || 'unknown', 'REMOVE_SERVICE', '', 'failed');
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST /api/service/start
+app.post('/api/service/start', auth.authMiddleware, serviceLimiter, async (req, res) => {
+    try {
+        const { serviceName } = req.body;
+        const result = await runServiceAction(serviceName, 'start');
+        if (!result) throw new Error('Falha ao iniciar o serviço');
+        
+        audit.logAction(req.user.username, 'START', serviceName, 'success');
+        res.json({ success: true, message: `Serviço ${serviceName} iniciado com sucesso!` });
+    } catch (error) {
+        audit.logAction(req.user?.username || 'unknown', 'START', serviceName, 'failed');
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// POST /api/service/stop
+app.post('/api/service/stop', auth.authMiddleware, serviceLimiter, async (req, res) => {
+    try {
+        const { serviceName } = req.body;
+        const result = await runServiceAction(serviceName, 'stop');
+        if (!result) throw new Error('Falha ao parar o serviço');
+        
+        audit.logAction(req.user.username, 'STOP', serviceName, 'success');
+        res.json({ success: true, message: `Serviço ${serviceName} parado com sucesso!` });
+    } catch (error) {
+        audit.logAction(req.user?.username || 'unknown', 'STOP', serviceName, 'failed');
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// POST /api/service/restart
+app.post('/api/service/restart', auth.authMiddleware, serviceLimiter, async (req, res) => {
+    try {
+        const { serviceName } = req.body;
+        const result = await runServiceAction(serviceName, 'restart');
+        if (!result) throw new Error('Falha ao reiniciar o serviço');
+        
+        audit.logAction(req.user.username, 'RESTART', serviceName, 'success');
+        res.json({ success: true, message: `Serviço ${serviceName} reiniciado com sucesso!` });
+    } catch (error) {
+        audit.logAction(req.user?.username || 'unknown', 'RESTART', serviceName, 'failed');
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// POST /api/update-settings
+app.post('/api/update-settings', auth.authMiddleware, auth.adminMiddleware, async (req, res) => {
+    try {
+        const { port, interval, discordWebhookUrl, notifyOnStartup } = req.body;
+        const servicesPath = path.join(__dirname, 'services.json');
+        const data = await fs.readFile(servicesPath, 'utf8');
+        const config = JSON.parse(data);
+        
+        if (port) config.port = port;
+        if (interval) config.interval = interval;
+        if (discordWebhookUrl) config.discordWebhookUrl = discordWebhookUrl;
+        if (typeof notifyOnStartup === 'boolean') config.notifyOnStartup = notifyOnStartup;
+        
+        await fs.writeFile(servicesPath, JSON.stringify(config, null, 2));
+        
+        audit.logAction(req.user.username, 'UPDATE_SETTINGS', 'Sistema', 'success');
+        
+        res.json({ success: true, message: 'Configurações atualizadas com sucesso' });
+    } catch (error) {
+        audit.logAction(req.user?.username || 'unknown', 'UPDATE_SETTINGS', '', 'failed');
+        res.status(500).json({ error: error.message });
     }
 });
 

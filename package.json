@@ -21,8 +21,11 @@
   "license": "ISC",
   "description": "Monitora serviços do Windows e envia notificações via Discord",
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "discord-webhook-node": "^1.1.8",
     "express": "^4.18.2",
+    "express-rate-limit": "^8.2.1",
+    "jsonwebtoken": "^9.0.3",
     "node-windows": "^1.0.0-beta.8",
     "winston": "^3.19.0"
   }

@@ -6,13 +6,13 @@
     <title>Service Monitor Pro | Dashboard</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
     <link rel="stylesheet" href="styles.css">
     <link rel="icon" href="img/logo.png" type="image/png">
 </head>
 <body>
 
-    <aside class="sidebar">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
         <div class="sidebar-brand">
             <div class="logo-box">
                 <i class="fas fa-terminal"></i>
@@ -27,18 +27,31 @@
             <button class="nav-item" data-tab="monitored">
                 <i class="fas fa-chart-line"></i> Monitorados
             </button>
+            <button class="nav-item" data-tab="audit">
+                <i class="fas fa-history"></i> Auditoria
+            </button>
             <button class="nav-item" data-tab="settings">
                 <i class="fas fa-cog"></i> Configurações
             </button>
         </nav>
 
         <div class="sidebar-footer">
-            <div class="status-indicator">
-                <span class="dot pulse"></span> Sistema Ativo
+            <div class="user-info">
+                <div class="user-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="user-details">
+                    <div class="user-name" id="userName">Admin</div>
+                    <div class="user-role">Administrador</div>
+                </div>
             </div>
+            <button class="btn-logout" id="logoutBtn" title="Fazer logout">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
         </div>
     </aside>
 
+    <!-- MAIN CONTENT -->
     <main class="main-content">
         <header class="top-bar">
             <div class="page-title">
@@ -46,18 +59,24 @@
                 <p>Monitoramento em tempo real do host local</p>
             </div>
             
-            <div class="stats-cards">
-                <div class="stat-card">
-                    <span class="stat-label">Total</span>
-                    <span class="stat-value" id="stat-total">--</span>
+            <div class="header-actions">
+                <div class="stats-cards">
+                    <div class="stat-card">
+                        <span class="stat-label">Total</span>
+                        <span class="stat-value" id="stat-total">--</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Ativos</span>
+                        <span class="stat-value text-success" id="stat-running">--</span>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <span class="stat-label text-success">Ativos</span>
-                    <span class="stat-value text-success" id="stat-running">--</span>
-                </div>
+                <button class="theme-toggle" id="themeToggle" title="Alternar tema">
+                    <i class="fas fa-moon"></i>
+                </button>
             </div>
         </header>
 
+        <!-- TAB: DISCOVER -->
         <div id="discover" class="tab-pane active">
             <section class="card">
                 <div class="card-header">
@@ -82,11 +101,11 @@
                     </select>
                 </div>
 
-                <div id="servicesList" class="grid-list">
-                    </div>
+                <div id="servicesList" class="grid-list"></div>
             </section>
         </div>
 
+        <!-- TAB: MONITORED -->
         <div id="monitored" class="tab-pane">
             <section class="card">
                 <div class="card-header">
@@ -94,16 +113,41 @@
                         <h2>Monitoramento Ativo</h2>
                         <p>Serviços sendo observados pelo monitor.js</p>
                     </div>
-                    <button id="refreshMonitoredBtn" class="btn btn-outline">
+                    <button id="refreshMonitoredBtn" class="btn btn-primary">
                         <i class="fas fa-redo"></i> Atualizar
                     </button>
                 </div>
                 
                 
-                <div id="monitoredList" class="grid-list">
-                    </div>
+                <div id="monitoredList" class="grid-list"></div>
             </section>
         </div>
+
+        <!-- TAB: AUDIT -->
+        <div id="audit" class="tab-pane">
+            <section class="card">
+                <div class="card-header">
+                    <div>
+                        <h2>Histórico de Auditoria</h2>
+                        <p>Registro de todas as ações realizadas no sistema.</p>
+                    </div>
+                    <button id="refreshAuditBtn" class="btn btn-primary">
+                        <i class="fas fa-redo"></i> Atualizar
+                    </button>
+                </div>
+
+                <div id="auditFilterSection" class="filters">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="auditSearchInput" placeholder="Filtrar por usuário ou ação...">
+                    </div>
+                </div>
+
+                <div id="auditList" class="audit-list"></div>
+            </section>
+        </div>
+
+        <!-- TAB: SETTINGS -->
         <div id="settings" class="tab-pane">
             <section class="card">
                 <div class="card-header">
@@ -147,11 +191,31 @@
                         </div>
                     </div>
                 </div>
-                
             </section>
         </div>
     </main>
 
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- MODAL: CONFIRMATION -->
+    <div class="modal-overlay" id="confirmationModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 id="confirmTitle">Confirmação</h3>
+                <button class="modal-close" onclick="closeModal('confirmationModal')"></button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmMessage">Tem certeza que deseja continuar?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('confirmationModal')">Cancelar</button>
+                <button class="btn btn-danger" id="confirmBtn">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: LOADING -->
     <div id="loadingModal" class="modal">
         <div class="modal-content">
             <div class="spinner"></div>
@@ -170,6 +234,5 @@
 
     <script src="js/sweetalert2.js"></script>
     <script src="js/script.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
 </body>
 </html>
