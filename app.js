@@ -334,16 +334,70 @@ app.post('/api/settings', auth.authMiddleware, auth.adminMiddleware, async (req,
         const filePath = path.join(__dirname, 'services.json');
         const data = await fs.readFile(filePath, 'utf8');
         const fullConfig = JSON.parse(data);
-
-        // Mescla as novas configurações mantendo os serviços intactos
-        const updatedConfig = {
-            services: fullConfig.services,
-            ...newSettings
+        
+        const fieldMapping = {
+            port: fullConfig.servidor?.port,
+            interval: fullConfig.monitoring?.checkInterval,
+            discordWebhookUrl: fullConfig.discord?.webhookUrl,
+            notifyOnStartup: fullConfig.discord?.sendStartupMessage
         };
+        
+        // Converte os dados achatados para estrutura aninhada
+        const Alterados = {};
+        const updatedConfig = JSON.parse(JSON.stringify(fullConfig)); // Deep clone
 
+        // Detecta o que foi alterado
+        Object.keys(newSettings).forEach(key => {
+            const newValue = newSettings[key];
+            const oldValue = fieldMapping[key];
+            
+            if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
+                Alterados[key] = { old: oldValue, new: newValue };
+            }
+        });
+
+        // Aplica as alterações no updatedConfig
+        Object.keys(Alterados).forEach(key => {
+            const newValue = Alterados[key].new;
+            switch (key) { 
+                case 'port':
+                    updatedConfig.servidor.port = newValue;
+                    break;
+                case 'interval': 
+                    updatedConfig.monitoring.checkInterval = newValue;
+                    break;
+                case 'discordWebhookUrl':
+                    updatedConfig.discord.webhookUrl = newValue;
+                    break;
+                case 'notifyOnStartup': 
+                    updatedConfig.discord.sendStartupMessage = newValue;
+                    break;
+                default:
+                    break;
+            }
+        });
+        // Se não houve alterações
+        if (Object.keys(Alterados).length === 0) {
+            return res.json({ 
+                success: true, 
+                message: "Nenhuma alteração detectada" 
+            });
+        }
+
+        // Escreve no arquivo
         await fs.writeFile(filePath, JSON.stringify(updatedConfig, null, 2));
-        await audit.logAction(req.user.username, 'UPDATE_SETTINGS', { settings: Object.keys(newSettings), ip: req.ip });
-        res.json({ success: true, message: "Configurações salvas! Reinicie o servidor para aplicar os novos parâmetros." });
+        
+        // Log de auditoria
+        await audit.logAction(req.user.username, 'UPDATE_SETTINGS', { 
+            changes: Alterados,
+            ip: req.ip 
+        });
+        
+        res.json({ 
+            success: true, 
+            message: "Configurações salvas! Reinicie o servidor para aplicar os novos parâmetros.",
+            changes: Alterados
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

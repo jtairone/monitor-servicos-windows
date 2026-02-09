@@ -188,7 +188,7 @@ function setupEventListeners() {
     document.getElementById('logoutBtn').addEventListener('click', logout);
 
     // Search filters
-    const searchInput = document.getElementById('searchInput');
+    /* const searchInput = document.getElementById('searchInput');
     if (searchInput) {
         searchInput.addEventListener('input', filterServices);
     }
@@ -196,7 +196,7 @@ function setupEventListeners() {
     const statusFilter = document.getElementById('statusFilter');
     if (statusFilter) {
         statusFilter.addEventListener('change', filterServices);
-    }
+    } */
 
     const auditSearchInput = document.getElementById('auditSearchInput');
     if (auditSearchInput) {
@@ -299,6 +299,18 @@ async function discoverServices() {
         const filterSection = document.getElementById('filterSection');
         if (filterSection) {
             filterSection.style.display = 'flex';
+
+            // Configurar listeners DOS FILTROS
+            const statusFilter = document.getElementById('statusFilter');
+            const searchInput = document.getElementById('searchInput');
+            
+            if (statusFilter) {
+                statusFilter.addEventListener('change', filterServices);
+            }
+            
+            if (searchInput) {
+                searchInput.addEventListener('input', filterServices);
+            }
         }
         
         hideLoading();
@@ -596,6 +608,42 @@ async function loadAuditLogs() {
     }
 }
 
+function formatChanges(changes) {
+    if (!changes || typeof changes !== 'object') return '';
+    
+    const items = [];
+    
+    // Mapeia os nomes amigáveis
+    const fieldNames = {
+        'port': 'Porta',
+        'interval': 'Intervalo',
+        'discordWebhookUrl': 'Webhook Discord',
+        'notifyOnStartup': 'Notificação no Início'
+    };
+    
+    Object.keys(changes).forEach(key => {
+        const fieldName = fieldNames[key] || key;
+        const oldVal = changes[key].old;
+        const newVal = changes[key].new;
+        
+        // Formata valores específicos
+        let formattedOld = oldVal;
+        let formattedNew = newVal;
+        
+        if (key === 'interval') {
+            formattedOld = `${oldVal}ms`;
+            formattedNew = `${newVal}ms`;
+        } else if (key === 'notifyOnStartup') {
+            formattedOld = oldVal ? 'Sim' : 'Não';
+            formattedNew = newVal ? 'Sim' : 'Não';
+        }
+        
+        items.push(`${fieldName}: ${formattedOld} → ${formattedNew}`);
+    });
+    
+    return items.join('<br>');
+}
+
 function renderAuditLogs(logs) {
     const container = document.getElementById('auditList');
     
@@ -626,8 +674,9 @@ function renderAuditLogs(logs) {
                     ${log.details.count ? `<span><i class="fas fa-list-ol"></i> ${log.details.count} itens</span>` : ''}
                     ${log.details.count && log.details.ip ? ' <span class="separator">|</span> ' : ''}
                     ${log.details.ip ? `<span><i class="fas fa-network-wired"></i> ${log.details.ip}</span>` : ''}
-                    ${log.details.serviceName ? ' <span class="separator">|</span> ' : ''}
+                    ${log.details.serviceName || log.details.changes ? ' <span class="separator">|</span> ' : ''}
                     ${log.details.serviceName ? `<span><i class="fas fa-cogs"></i> ${log.details.serviceName}</span>` : ''}
+                    ${log.details.changes ? formatChanges(log.details.changes) : ''}
                 </div>
             </div>
             <div class="audit-time">${formatDate(log.timestamp)}</div>
@@ -741,8 +790,8 @@ async function saveSettings() {
         
         btn.innerHTML = originalHTML;
         btn.disabled = false;
-        
-        showToast('Configurações salvas com sucesso!', 'success');
+        const responseData = await response.json();
+        showToast(responseData.message, 'success');
     } catch (error) {
         const btn = document.getElementById('saveSettingsBtn');
         btn.innerHTML = '<i class="fas fa-save"></i> Salvar Alterações';
@@ -766,6 +815,7 @@ function updateStats() {
 }
 
 function filterServices() {
+    console.log('Filtering services with search term and status filter');
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     const statusFilter = document.getElementById('statusFilter').value;
 
@@ -773,7 +823,7 @@ function filterServices() {
         (s.name.toLowerCase().includes(searchTerm) || s.displayName.toLowerCase().includes(searchTerm)) &&
         (!statusFilter || s.status === statusFilter)
     );
-
+    console.log('Filtered services:', filtered);
     renderServicesList(filtered);
 }
 
@@ -788,6 +838,7 @@ async function logout() {
     } finally {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        localStorage.removeItem('rememberMe');
         window.location.href = '/login';
     }
 }
