@@ -983,3 +983,13 @@ textarea:focus {
         min-width: auto;
     }
 }
+
+.audit-details {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    color: #666; /* Ou uma cor suave */
+}
+.separator {
+    color: #ccc;
+}

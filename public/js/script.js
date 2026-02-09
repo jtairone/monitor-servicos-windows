@@ -614,7 +614,7 @@ function renderAuditLogs(logs) {
         if (status === 'logout') return 'logout';
         return 'success';
     };
-
+    
     container.innerHTML = logs.map(log => `
         <div class="audit-item ${getStatusClass(log.status)}">
             <div class="audit-info">
@@ -622,7 +622,13 @@ function renderAuditLogs(logs) {
                     <i class="fas fa-${getActionIcon(log.action)}"></i> ${log.action}
                 </div>
                 <div class="audit-user">${log.username}</div>
-                ${log.details ? `<div class="audit-user" style="margin-top: 4px;">${log.details}</div>` : ''}
+                <div class="audit-details" style="margin-top: 4px; font-size: 0.85em; opacity: 0.8;">
+                    ${log.details.count ? `<span><i class="fas fa-list-ol"></i> ${log.details.count} itens</span>` : ''}
+                    ${log.details.count && log.details.ip ? ' <span class="separator">|</span> ' : ''}
+                    ${log.details.ip ? `<span><i class="fas fa-network-wired"></i> ${log.details.ip}</span>` : ''}
+                    ${log.details.serviceName ? ' <span class="separator">|</span> ' : ''}
+                    ${log.details.serviceName ? `<span><i class="fas fa-cogs"></i> ${log.details.serviceName}</span>` : ''}
+                </div>
             </div>
             <div class="audit-time">${formatDate(log.timestamp)}</div>
         </div>

@@ -16,10 +16,7 @@ console.log('[1] Express carregado');
 
 async function runServiceAction(serviceName, action) {
     try {
-        //console.log(`🔧 Executando ${action} no serviço: ${serviceName}`);
-        
-        let psCommand = '';
-        
+        let psCommand = ''; 
         switch (action) {
             case 'stop':
                 psCommand = `Stop-Service -Name "${serviceName}" -Force -ErrorAction Stop; Write-Output "SUCCESS"`;
@@ -60,7 +57,7 @@ async function runServiceAction(serviceName, action) {
                 
                 // Verificar se foi bem-sucedido
                 const success = output.includes('SUCCESS') && !output.includes('FAILED');
-                console.log(`✅ Resultado: ${success ? 'Sucesso' : 'Falha'}`);
+                //console.log(`✅ Resultado: ${success ? 'Sucesso' : 'Falha'}`);
                 
                 resolve(success);
             });
@@ -479,7 +476,6 @@ app.post('/api/stopservice/:serviceName', auth.authMiddleware, serviceLimiter, a
     const { serviceName } = req.params;
     try {
         const result = await runServiceAction(serviceName, 'stop');
-        console.log(result)
         if (!result) {
             throw new Error('Falha ao parar o serviço');
         }
@@ -518,7 +514,7 @@ app.post('/api/restartservice/:serviceName', auth.authMiddleware, serviceLimiter
 // AUDIT LOGS ENDPOINT
 app.get('/api/audit-logs', auth.authMiddleware, async (req, res) => {
     try {
-        const logs = audit.getAuditLogs(500); // últimos 500 eventos
+        const logs = await audit.getAuditLogs(500); // últimos 500 eventos
         res.json({ logs });
     } catch (error) {
         logger.error(`Erro ao obter logs de auditoria: ${error.message}`);
@@ -617,10 +613,10 @@ app.post('/api/service/start', auth.authMiddleware, serviceLimiter, async (req, 
         const result = await runServiceAction(serviceName, 'start');
         if (!result) throw new Error('Falha ao iniciar o serviço');
         
-        audit.logAction(req.user.username, 'START', serviceName, 'success');
+        audit.logAction(req.user.username, 'START', { ip: req.ip, serviceName }, 'success');
         res.json({ success: true, message: `Serviço ${serviceName} iniciado com sucesso!` });
     } catch (error) {
-        audit.logAction(req.user?.username || 'unknown', 'START', serviceName, 'failed');
+        audit.logAction(req.user?.username || 'unknown', 'START', {serviceName}, 'failed');
         res.status(500).json({ success: false, message: error.message });
     }
 });
@@ -632,10 +628,10 @@ app.post('/api/service/stop', auth.authMiddleware, serviceLimiter, async (req, r
         const result = await runServiceAction(serviceName, 'stop');
         if (!result) throw new Error('Falha ao parar o serviço');
         
-        audit.logAction(req.user.username, 'STOP', serviceName, 'success');
+        audit.logAction(req.user.username, 'STOP', { ip: req.ip, serviceName }, 'success');
         res.json({ success: true, message: `Serviço ${serviceName} parado com sucesso!` });
     } catch (error) {
-        audit.logAction(req.user?.username || 'unknown', 'STOP', serviceName, 'failed');
+        audit.logAction(req.user?.username || 'unknown', 'STOP', {serviceName}, 'failed');
         res.status(500).json({ success: false, message: error.message });
     }
 });
@@ -647,10 +643,10 @@ app.post('/api/service/restart', auth.authMiddleware, serviceLimiter, async (req
         const result = await runServiceAction(serviceName, 'restart');
         if (!result) throw new Error('Falha ao reiniciar o serviço');
         
-        audit.logAction(req.user.username, 'RESTART', serviceName, 'success');
+        audit.logAction(req.user.username, 'RESTART', { ip: req.ip, serviceName }, 'success');
         res.json({ success: true, message: `Serviço ${serviceName} reiniciado com sucesso!` });
     } catch (error) {
-        audit.logAction(req.user?.username || 'unknown', 'RESTART', serviceName, 'failed');
+        audit.logAction(req.user?.username || 'unknown', 'RESTART', {serviceName}, 'failed');
         res.status(500).json({ success: false, message: error.message });
     }
 });
