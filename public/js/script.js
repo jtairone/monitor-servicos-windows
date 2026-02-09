@@ -285,33 +285,40 @@ function renderServicesList(services) {
         return;
     }
 
-    container.innerHTML = services.map(service => `
+    container.innerHTML = services.map(service => {
+        const name = service.name || service.Name;
+        const displayName = service.displayName || service.DisplayName || name;
+        const status = service.status || service.State || 'Unknown';
+        const isRunning = status === 'Running';
+        
+        return `
         <div class="service-card">
             <div class="service-header">
-                <div class="service-name">${service.Name}</div>
-                <span class="service-status ${service.State === 'Running' ? 'status-running' : 'status-stopped'}">
-                    ${service.State === 'Running' ? 'Rodando' : 'Parado'}
+                <div class="service-name">${name}</div>
+                <span class="service-status ${isRunning ? 'status-running' : 'status-stopped'}">
+                    ${isRunning ? 'Rodando' : 'Parado'}
                 </span>
             </div>
-            <div class="service-description">${service.DisplayName || 'Sem descrição'}</div>
+            <div class="service-description">${displayName}</div>
             <div class="service-actions">
-                ${service.State === 'Running' 
-                    ? `<button class="btn btn-sm btn-danger" onclick="stopService('${service.Name}')">
+                ${isRunning
+                    ? `<button class="btn btn-sm btn-danger" onclick="stopService('${name}')">
                         <i class="fas fa-stop"></i> Parar
                       </button>`
-                    : `<button class="btn btn-sm btn-success" onclick="startService('${service.Name}')">
+                    : `<button class="btn btn-sm btn-success" onclick="startService('${name}')">
                         <i class="fas fa-play"></i> Iniciar
                       </button>`
                 }
-                <button class="btn btn-sm btn-warning" onclick="restartService('${service.Name}')">
+                <button class="btn btn-sm btn-warning" onclick="restartService('${name}')">
                     <i class="fas fa-sync"></i> Reiniciar
                 </button>
-                <button class="btn btn-sm btn-primary" onclick="addToMonitored('${service.Name}', '${service.DisplayName}')">
+                <button class="btn btn-sm btn-primary" onclick="addToMonitored('${name}', '${displayName}')">
                     <i class="fas fa-plus"></i> Monitorar
                 </button>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // ==========================================
@@ -363,13 +370,20 @@ async function executeServiceAction(serviceName, action) {
 
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.message || `Erro ao ${action} o serviço`);
+            throw new Error(error.message || error.error || `Erro ao ${action} o serviço`);
         }
 
         hideLoading();
         const actionText = action === 'start' ? 'iniciado' : action === 'stop' ? 'parado' : 'reiniciado';
         showToast(`Serviço ${actionText} com sucesso!`, 'success');
-        await loadServices();
+        
+        // Recarregar a lista apropriada
+        const currentTab = document.querySelector('.nav-item.active')?.dataset.tab;
+        if (currentTab === 'discover') {
+            await discoverServices();
+        } else if (currentTab === 'monitored') {
+            await loadMonitoredServices();
+        }
     } catch (error) {
         hideLoading();
         showToast(error.message, 'error');
@@ -394,15 +408,16 @@ async function addToMonitored(serviceName, displayName) {
 
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.message || 'Erro ao adicionar serviço');
+            throw new Error(error.error || error.message || 'Erro ao adicionar serviço');
         }
 
         hideLoading();
         showToast('Serviço adicionado ao monitoramento!', 'success');
-        await loadServices();
+        await discoverServices(); // Recarregar lista de serviços
     } catch (error) {
         hideLoading();
         showToast(error.message, 'error');
+        console.error(error);
     }
 }
 
@@ -412,6 +427,12 @@ async function addToMonitored(serviceName, displayName) {
 
 async function loadMonitoredServices() {
     try {
+        const btn = document.getElementById('refreshMonitoredBtn');
+        const originalHTML = btn.innerHTML;
+        
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Atualizando...';
+        
         const response = await fetch(`${API_BASE}/api/list-services`, {
             headers: getAuthHeader()
         });
@@ -422,7 +443,18 @@ async function loadMonitoredServices() {
         monitoredServices = data.services || [];
         
         renderMonitoredServices(monitoredServices);
+        
+        btn.innerHTML = '<i class="fas fa-check-circle"></i> Atualizado!';
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+        showToast('Status dos serviços atualizado', 'success');
     } catch (error) {
+        const btn = document.getElementById('refreshMonitoredBtn');
+        btn.innerHTML = '<i class="fas fa-redo"></i> Atualizar';
+        btn.disabled = false;
+        
         showToast(error.message, 'error');
         console.error(error);
     }
@@ -436,30 +468,37 @@ function renderMonitoredServices(services) {
         return;
     }
 
-    container.innerHTML = services.map(service => `
+    container.innerHTML = services.map(service => {
+        const name = service.name;
+        const displayName = service.displayName || name;
+        const status = service.status || 'unknown';
+        const isRunning = status === 'running' || status === 'Running';
+        
+        return `
         <div class="service-card">
             <div class="service-header">
-                <div class="service-name">${service.name}</div>
-                <span class="service-status ${service.status === 'running' ? 'status-running' : 'status-stopped'}">
-                    ${service.status === 'running' ? 'Rodando' : 'Parado'}
+                <div class="service-name">${name}</div>
+                <span class="service-status ${isRunning ? 'status-running' : 'status-stopped'}">
+                    ${isRunning ? 'Rodando' : 'Parado'}
                 </span>
             </div>
-            <div class="service-description">${service.displayName || 'Sem descrição'}</div>
+            <div class="service-description">${displayName}</div>
             <div class="service-actions">
-                ${service.status === 'running' 
-                    ? `<button class="btn btn-sm btn-danger" onclick="stopService('${service.name}')">
+                ${isRunning
+                    ? `<button class="btn btn-sm btn-danger" onclick="stopService('${name}')">
                         <i class="fas fa-stop"></i> Parar
                       </button>`
-                    : `<button class="btn btn-sm btn-success" onclick="startService('${service.name}')">
+                    : `<button class="btn btn-sm btn-success" onclick="startService('${name}')">
                         <i class="fas fa-play"></i> Iniciar
                       </button>`
                 }
-                <button class="btn btn-sm btn-danger" onclick="removeMonitored('${service.name}')">
+                <button class="btn btn-sm btn-danger" onclick="removeMonitored('${name}')">
                     <i class="fas fa-trash"></i> Remover
                 </button>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 async function removeMonitored(serviceName) {
@@ -479,7 +518,10 @@ async function removeMonitored(serviceName) {
                     body: JSON.stringify({ name: serviceName })
                 });
 
-                if (!response.ok) throw new Error('Erro ao remover serviço');
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || error.message || 'Erro ao remover serviço');
+                }
 
                 hideLoading();
                 showToast('Serviço removido do monitoramento!', 'success');
@@ -613,7 +655,7 @@ async function saveSettings() {
 // ==========================================
 
 function updateStats() {
-    const running = allServices.filter(s => s.State === 'Running').length;
+    const running = allServices.filter(s => (s.status || s.State) === 'Running').length;
     const total = allServices.length;
 
     document.getElementById('stat-total').textContent = total;
