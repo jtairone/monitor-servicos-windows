@@ -22,6 +22,45 @@ Uma aplicação completa Node.js + Express que monitora serviços do Windows e e
 - ✅ **Configuração JSON** - Fácil de customizar
 - ✅ **Responsivo** - Funciona em desktop, tablet e mobile
 
+## 🔐 Funcionalidades Phase 2 (Novas)
+
+- ✅ **Autenticação JWT** - Login seguro com JWT tokens (24h expiry)
+- ✅ **Encriptação de Senha** - Bcryptjs com 10 salt rounds
+- ✅ **Auditoria Completa** - Registro de todas as ações (LOGIN, LOGOUT, START, STOP, RESTART, ADD_SERVICE, REMOVE_SERVICE)
+- ✅ **Rate Limiting** - Proteção contra força bruta (5 tentativas/15min login, 10 ações/min)
+- ✅ **Dark Mode** - Tema escuro com CSS variables e persistência localStorage
+- ✅ **Toast Notifications** - Notificações visuais para ações do usuário
+- ✅ **Modais de Confirmação** - Confirmações para ações críticas
+- ✅ **Interface Responsiva** - Design mobile-first com breakpoints (1200px, 768px, 480px)
+- ✅ **Filtros Avançados** - Busca por nome/descrição e filtro por status
+- ✅ **Aba de Auditoria** - Visualização de histórico de ações com timestamps
+- ✅ **Gerenciamento de Configurações** - Editar porta, intervalo, webhooks via interface
+
+## 🗺️ Roadmap - Funcionalidades Futuras
+
+### 📋 Em Desenvolvimento
+- [ ] **Notificações via Telegram** - Suporte a Bot do Telegram como alternativa ao Discord
+  - Integração com API do Telegram
+  - Autenticação via token de bot
+  - Mensagens formatadas com status dos serviços
+  
+- [ ] **Monitoramento de Hosts Remotos (Multi-agent)** - Expandir para maquinas na rede
+  - Agente Node.js em hosts remotos
+  - Sincronização com servidor central
+  - Dashboard unificado com múltiplos hosts
+  - Comunicação segura (SSL/TLS)
+  
+- [ ] **Notificações do Windows** - Toast notifications nativas do SO
+  - Integração com Windows Notification System
+  - Cliques na notificação abrem dashboard
+
+### 🎯 Planejado para Futuro
+- [ ] **Email Notifications** - Suporte a notificações via SMTP
+- [ ] **Database Integration** - Migrar para MongoDB/MySQL para histórico persistente
+- [ ] **Gráficos de Uptime** - Dashboard com estatísticas visuais
+- [ ] **Two-Factor Authentication** - 2FA com autenticador mobile
+- [ ] **Role-Based Access Control** - Diferentes níveis de permissão (admin, monitor, viewer)
+
 ## 📋 Pré-requisitos
 
 - **Node.js** v14 ou superior
@@ -511,7 +550,7 @@ node src/discover-services.js
 ```powershell
 # Abra http://localhost:3000 e vá em "Serviços Monitorados"
 # Ou verifique services.json diretamente:
-type services.json
+services.json
 ```
 
 ### Verificar Status do Monitor
@@ -561,6 +600,14 @@ Tairone Morais
 
 ---
 
-**Última atualização:** 26 de dezembro de 2025  
-**Versão:** 2.1.0  
+**Última atualização:** 9 de fevereiro de 2026  
+**Versão:** 2.0.0 (Phase 2 - Segurança & Interface)  
 **Status:** ✅ Pronto para Produção
+
+### Histórico de Versões
+
+| Versão | Data | Destaques |
+|--------|------|----------|
+| 3.0.0 | 09/02/2026 | ✅ Autenticação JWT, Auditoria, Dark Mode, Responsivo |
+| 2.1.0 | 26/12/2025 | ✅ Interface Web completa, Notificações Discord |
+| 1.0.0 | 01/12/2025 | ✅ Monitor básico em background |

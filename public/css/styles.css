@@ -993,3 +993,13 @@ textarea:focus {
 .separator {
     color: #ccc;
 }
+
+.app-footer {
+    margin-top: auto; /* Empurra o footer para o final do container flex */
+    text-align: center;
+}
+
+.app-footer .footer-brand {
+    font-style: italic;
+    font-weight: bold;
+}
