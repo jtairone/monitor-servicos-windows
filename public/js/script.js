@@ -7,6 +7,9 @@ let currentUser = null;
 let allServices = [];
 let monitoredServices = [];
 let allAuditLogs = [];
+const cfgInterval = document.getElementById('cfg-interval');
+const msValue = document.getElementById('ms-value');
+const secValue = document.getElementById('sec-value');
 
 // ==========================================
 // INICIALIZAÇÃO
@@ -18,6 +21,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupEventListeners();
     await loadAuditLogs(); // Carregar logs de auditoria na inicialização
 });
+
+// Escuta a digitação no campo de intervalo para atualizar a legenda em tempo real
+cfgInterval.addEventListener('input', updateIntervalHelper);
+
+// Atualiza o texto de ajuda (ms para segundos)
+function updateIntervalHelper() {
+    const ms = parseInt(cfgInterval.value) || 0;
+    const sec = (ms / 1000).toFixed(1);
+    
+    if(msValue) msValue.textContent = ms;
+    if(secValue) secValue.textContent = sec;
+}
 
 // ==========================================
 // AUTENTICAÇÃO E VERIFICAÇÃO DE TOKEN
@@ -235,11 +250,18 @@ function switchTab(e) {
 
     // Load data for specific tabs
     if (tabName === 'discover') {
-        discoverServices();
+        // Mostrar filtros quando discover for clicado
+        if (allServices.length === 0) {
+            discoverServices();
+        } else {
+            document.getElementById('filterSection').style.display = 'flex';
+        }
     } else if (tabName === 'audit') {
         loadAuditLogs();
     } else if (tabName === 'monitored') {
         loadMonitoredServices();
+    } else if (tabName === 'settings') {
+        loadSettings();
     }
 }
 
@@ -266,7 +288,12 @@ async function discoverServices() {
         
         renderServicesList(allServices);
         updateStats();
-        document.getElementById('filterSection').style.display = 'flex';
+        
+        // Mostrar filtros
+        const filterSection = document.getElementById('filterSection');
+        if (filterSection) {
+            filterSection.style.display = 'flex';
+        }
         
         hideLoading();
         showToast(`${allServices.length} serviços descobertos com sucesso`, 'success');
@@ -617,6 +644,42 @@ function getActionIcon(action) {
 // SETTINGS
 // ==========================================
 
+// ==========================================
+// SETTINGS
+// ==========================================
+
+async function loadSettings() {
+    try {
+        showLoading('Carregando configurações...');
+        
+        const response = await fetch(`${API_BASE}/api/settings`, {
+            headers: getAuthHeader()
+        });
+
+        if (!response.ok) {
+            console.warn('Erro ao carregar configurações, usando valores padrão');
+            hideLoading();
+            return;
+        }
+
+        const settings = await response.json();
+        
+        // Popular os campos com os valores do servidor
+        document.getElementById('cfg-port').value = settings.servidor?.port || 3000;
+        document.getElementById('cfg-interval').value = settings.monitoring?.checkInterval || 30000;
+        document.getElementById('cfg-discord-url').value = settings.discord?.webhookUrl || '';
+        document.getElementById('cfg-discord-startup').checked = settings.discord?.sendStartupMessage || false;
+        updateIntervalHelper();
+        hideLoading();
+    } catch (error) {
+        hideLoading();
+        console.error('Erro ao carregar configurações:', error);
+        // Usar valores padrão
+        document.getElementById('cfg-port').value = 3001;
+        document.getElementById('cfg-interval').value = 30000;
+    }
+}
+
 async function saveSettings() {
     try {
         const port = document.getElementById('cfg-port').value;
@@ -624,29 +687,50 @@ async function saveSettings() {
         const discordUrl = document.getElementById('cfg-discord-url').value;
         const discordStartup = document.getElementById('cfg-discord-startup').checked;
 
-        showLoading('Salvando configurações...');
+        if (!port || !interval) {
+            showToast('Porta e Intervalo são obrigatórios', 'warning');
+            return;
+        }
 
-        const response = await fetch(`${API_BASE}/api/update-settings`, {
+        const btn = document.getElementById('saveSettingsBtn');
+        const originalHTML = btn.innerHTML;
+        
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+
+        const response = await fetch(`${API_BASE}/api/settings`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 ...getAuthHeader()
             },
             body: JSON.stringify({
-                port: port ? parseInt(port) : undefined,
-                interval: interval ? parseInt(interval) : undefined,
-                discordWebhookUrl: discordUrl,
+                port: parseInt(port),
+                interval: parseInt(interval),
+                discordWebhookUrl: discordUrl || null,
                 notifyOnStartup: discordStartup
             })
         });
 
-        if (!response.ok) throw new Error('Erro ao salvar configurações');
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || error.error || 'Erro ao salvar configurações');
+        }
 
-        hideLoading();
+        btn.innerHTML = '<i class="fas fa-check-circle"></i> Salvo!';
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+        
         showToast('Configurações salvas com sucesso!', 'success');
     } catch (error) {
-        hideLoading();
+        const btn = document.getElementById('saveSettingsBtn');
+        btn.innerHTML = '<i class="fas fa-save"></i> Salvar Alterações';
+        btn.disabled = false;
+        
         showToast(error.message, 'error');
+        console.error(error);
     }
 }
 
