@@ -750,15 +750,10 @@ function filterServices() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     const statusFilter = document.getElementById('statusFilter').value;
 
-    const filtered = allServices.filter(service => {
-        const matchesSearch = 
-            service.Name.toLowerCase().includes(searchTerm) ||
-            service.DisplayName.toLowerCase().includes(searchTerm);
-        
-        const matchesStatus = !statusFilter || service.State === statusFilter;
-
-        return matchesSearch && matchesStatus;
-    });
+    const filtered = allServices.filter(s => 
+        (s.name.toLowerCase().includes(searchTerm) || s.displayName.toLowerCase().includes(searchTerm)) &&
+        (!statusFilter || s.status === statusFilter)
+    );
 
     renderServicesList(filtered);
 }
