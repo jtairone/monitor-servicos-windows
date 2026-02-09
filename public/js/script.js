@@ -280,8 +280,14 @@ async function discoverServices() {
                 ...getAuthHeader()
             }
         });
-
-        if (!response.ok) throw new Error('Erro ao descobrir serviços');
+         if (!response.ok){
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/login';
+            } 
+            throw new Error('Erro ao descobrir serviços');
+        }
 
         const data = await response.json();
         allServices = data.services || [];
@@ -464,7 +470,14 @@ async function loadMonitoredServices() {
             headers: getAuthHeader()
         });
 
-        if (!response.ok) throw new Error('Erro ao carregar serviços monitorados');
+        if (!response.ok){
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/login';
+            } 
+            throw new Error('Erro ao carregar serviços monitorados');
+        }
 
         const data = await response.json();
         monitoredServices = data.services || [];
