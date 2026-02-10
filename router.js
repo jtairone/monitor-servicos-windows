@@ -427,7 +427,7 @@ router.get('/api/list-services', auth.authMiddleware, async (req, res) => {
 // POST /api/add-service (alias para /api/add-monitored-service)
 router.post('/api/add-service', auth.authMiddleware, async (req, res) => {
     try {
-        const { name, displayName } = req.body;
+        const { name, displayName, restartOnFailure } = req.body;
         
         if (!name || !displayName) {
             return res.status(400).json({ error: 'Nome e displayName são obrigatórios' });
@@ -444,7 +444,11 @@ router.post('/api/add-service', auth.authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Serviço já está sendo monitorado' });
         }
         
-        config.services.push({ name, displayName, restartOnFailure: false });
+        config.services.push({ 
+            name, 
+            displayName, 
+            restartOnFailure: Boolean(restartOnFailure) 
+        });
         await fs.writeFile(servicesPath, JSON.stringify(config, null, 2));
         
         audit.logAction(req.user.username, 'ADD_SERVICE', name, 'success');

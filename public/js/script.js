@@ -436,7 +436,28 @@ async function executeServiceAction(serviceName, action) {
 }
 
 async function addToMonitored(serviceName, displayName) {
+    // Preenche os campos do modal
+    document.getElementById('addServiceName').value = serviceName;
+    document.getElementById('addServiceDisplayName').value = displayName;
+    document.getElementById('addServiceRestartOnFailure').checked = false;
+    
+    // Armazena o serviço em variável global para usar em confirmAddService()
+    window.pendingService = { name: serviceName, displayName: displayName };
+    
+    showModal('addServiceModal');
+}
+
+async function confirmAddService() {
     try {
+        if (!window.pendingService) {
+            showToast('Erro ao adicionar serviço', 'error');
+            return;
+        }
+
+        const serviceName = window.pendingService.name;
+        const displayName = window.pendingService.displayName;
+        const restartOnFailure = document.getElementById('addServiceRestartOnFailure').checked;
+
         showLoading('Adicionando serviço ao monitoramento...');
         
         const response = await fetch(`${API_BASE}/api/add-service`, {
@@ -447,7 +468,8 @@ async function addToMonitored(serviceName, displayName) {
             },
             body: JSON.stringify({
                 name: serviceName,
-                displayName: displayName
+                displayName: displayName,
+                restartOnFailure: restartOnFailure
             })
         });
 
@@ -457,8 +479,12 @@ async function addToMonitored(serviceName, displayName) {
         }
 
         hideLoading();
+        closeModal('addServiceModal');
         showToast('Serviço adicionado ao monitoramento!', 'success');
         await discoverServices(); // Recarregar lista de serviços
+        
+        // Limpar variável global
+        window.pendingService = null;
     } catch (error) {
         hideLoading();
         showToast(error.message, 'error');
@@ -525,14 +551,25 @@ function renderMonitoredServices(services) {
         const displayName = service.displayName || name;
         const status = service.status || 'unknown';
         const isRunning = status === 'running' || status === 'Running';
+        const restartOnFailure = service.restartOnFailure || false;
         
         return `
         <div class="service-card">
             <div class="service-header">
                 <div class="service-name">${name}</div>
-                <span class="service-status ${isRunning ? 'status-running' : 'status-stopped'}">
-                    ${isRunning ? 'Rodando' : 'Parado'}
-                </span>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    ${restartOnFailure 
+                        ? `<span class="service-badge badge-restart-active" title="Restart automático ativo">
+                            <i class="fas fa-sync-alt"></i> Auto-Restart
+                           </span>`
+                        : `<span class="service-badge badge-restart-inactive" title="Restart automático desativo">
+                            <i class="fas fa-ban"></i> Sem Restart
+                           </span>`
+                    }
+                    <span class="service-status ${isRunning ? 'status-running' : 'status-stopped'}">
+                        ${isRunning ? 'Rodando' : 'Parado'}
+                    </span>
+                </div>
             </div>
             <div class="service-description">${displayName}</div>
             <div class="service-actions">

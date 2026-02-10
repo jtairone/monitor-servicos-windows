@@ -231,6 +231,44 @@
         </div>
     </div>
 
+    <!-- MODAL: ADD SERVICE TO MONITORING -->
+    <div class="modal-overlay" id="addServiceModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Adicionar Serviço ao Monitoramento</h3>
+                <button class="modal-close" onclick="closeModal('addServiceModal')">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="field" style="margin-bottom: 15px;">
+                    <label>Nome do Serviço</label>
+                    <input type="text" id="addServiceName" class="search-input" style="width: 100%;" readonly>
+                </div>
+                <div class="field" style="margin-bottom: 15px;">
+                    <label>Descrição</label>
+                    <input type="text" id="addServiceDisplayName" class="search-input" style="width: 100%;" readonly>
+                </div>
+                <div class="toggle-group" style="margin-top: 15px;">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="addServiceRestartOnFailure">
+                        <span class="slider"></span>
+                    </label>
+                    <span style="margin-left: 10px;">Ativar Restart Automático</span>
+                </div>
+                <p style="margin-top: 10px; font-size: 0.85em; color: var(--text-light);">
+                    <i class="fas fa-info-circle"></i> Se ativado, o serviço será reiniciado automaticamente caso pare de funcionar.
+                </p>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('addServiceModal')">Cancelar</button>
+                <button class="btn btn-primary" onclick="confirmAddService()">
+                    <i class="fas fa-plus"></i> Adicionar
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: LOGOUT CONFIRMATION -->
     <div class="modal-overlay" id="logoutModal">
     <div class="modal-box">
