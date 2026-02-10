@@ -50,6 +50,61 @@ const auth = {
         }
     },
 
+    // Registrar novo usuário (apenas um admin permitido)
+    async register(username, password) {
+        try {
+            // Validações
+            if (!username || username.length < 3) {
+                return { success: false, message: 'Usuário deve ter no mínimo 3 caracteres' };
+            }
+            
+            if (!password || password.length < 6) {
+                return { success: false, message: 'Senha deve ter no mínimo 6 caracteres' };
+            }
+            
+            // Ler arquivo de usuários
+            let users = [];
+            try {
+                const data = await fs.readFile(USERS_FILE, 'utf8');
+                users = JSON.parse(data);
+            } catch (error) {
+                // Se arquivo não existe, criar array vazio
+                users = [];
+            }
+            
+            // Verificar se já existe algum usuário (apenas um admin permitido)
+            if (users.length > 0) {
+                return { 
+                    success: false, 
+                    message: 'Um administrador já foi cadastrado. Entre em contato com o suporte para acesso.',
+                    alreadyRegistered: true 
+                };
+            }
+            
+            // Hash da senha
+            const hashedPassword = await bcrypt.hash(password, 10);
+            
+            // Adicionar novo usuário com role de admin
+            users.push({
+                username: username,
+                password: hashedPassword,
+                role: 'admin',
+                createdAt: new Date().toISOString()
+            });
+            
+            // Salvar arquivo de usuários
+            await fs.writeFile(USERS_FILE, JSON.stringify(users, null, 2));
+            
+            return {
+                success: true,
+                message: 'Administrador registrado com sucesso!'
+            };
+        } catch (error) {
+            console.error('Erro ao registrar:', error.message);
+            return { success: false, message: 'Erro ao registrar usuário' };
+        }
+    },
+
     // Verificar token
     verifyToken(token) {
         try {

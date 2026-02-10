@@ -18,6 +18,11 @@ router.get('/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
+// Página de registro
+router.get('/register', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'register.html'));
+});
+
 // API de login
 router.post('/api/login', loginLimiter, async (req, res) => {
     const { username, password } = req.body;
@@ -33,6 +38,49 @@ router.post('/api/login', loginLimiter, async (req, res) => {
         return res.json(result);
     }
     return res.status(401).json(result);
+});
+
+// API de registro
+router.post('/api/register', loginLimiter, async (req, res) => {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+        return res.status(400).json({ success: false, message: 'Usuário e senha são obrigatórios' });
+    }
+
+    const result = await auth.register(username, password);
+    
+    if (result.success) {
+        await audit.logAction(username, 'REGISTER', { ip: req.ip }, 'success');
+        return res.json(result);
+    }
+    
+    await audit.logAction(username || 'unknown', 'REGISTER', { ip: req.ip }, 'failed');
+    return res.status(400).json(result);
+});
+
+// API para verificar se admin existe
+router.get('/api/admin-status', async (req, res) => {
+    try {
+        const usersFile = path.join(__dirname, 'users.json');
+        let adminExists = false;
+        console.log(usersFile);
+        
+        try {
+            const data = await fs.readFile(usersFile, 'utf8');
+            const users = JSON.parse(data);
+            console.log(users.length);
+            adminExists = users.length > 0;
+        } catch (error) {
+            // Arquivo não existe ainda
+            console.log(error);
+            adminExists = false;
+        }
+        
+        res.json({ adminExists });
+    } catch (error) {
+        res.json({ adminExists: false });
+    }
 });
 
 // API de logout

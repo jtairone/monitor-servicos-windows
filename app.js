@@ -27,6 +27,21 @@ console.log('[3] Aplicação criada');
 console.log('[4] Configurando middlewares');
 app.use(express.json());
 app.use(express.static('public'));
+
+// Configurar CORS
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    // Responder a preflight requests
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    
+    next();
+});
+
 console.log('[5] Middlewares configurados');
 
 // Rotas de autenticação
