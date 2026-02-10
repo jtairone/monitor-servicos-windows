@@ -22,7 +22,7 @@ Uma aplicação completa Node.js + Express que monitora serviços do Windows e e
 - ✅ **Configuração JSON** - Fácil de customizar
 - ✅ **Responsivo** - Funciona em desktop, tablet e mobile
 
-## 🔐 Funcionalidades Phase 2 (Novas)
+## 🔐 Funcionalidades Phase 2 (Segurança)
 
 - ✅ **Autenticação JWT** - Login seguro com JWT tokens (24h expiry)
 - ✅ **Encriptação de Senha** - Bcryptjs com 10 salt rounds
@@ -36,30 +36,49 @@ Uma aplicação completa Node.js + Express que monitora serviços do Windows e e
 - ✅ **Aba de Auditoria** - Visualização de histórico de ações com timestamps
 - ✅ **Gerenciamento de Configurações** - Editar porta, intervalo, webhooks via interface
 
+## 🔑 Funcionalidades Phase 3 (Admin Único)
+
+- ✅ **Cadastro de Admin Único** - Apenas um administrador permitido na primeira execução
+- ✅ **Sistema de Registro** - Página dedicada para criar admin (desabilitada após primeiro cadastro)
+- ✅ **Slider Restart Automático** - Toggle interativo com feedback visual (verde quando ativo)
+- ✅ **Indicador de Restart** - Badges nos serviços monitorados mostrando status do restart (Auto-Restart/Sem Restart)
+- ✅ **Validação de Força de Senha** - Indicador em tempo real (Fraca/Média/Boa/Forte)
+- ✅ **CORS Habilitado** - Suporte a requisições cross-origin
+- ✅ **Verificação de Admin** - API endpoint para verificar se admin já existe
+- ✅ **Mensagens Personalizadas** - Feedback claro quando cadastro já foi realizado
+
 ## 🗺️ Roadmap - Funcionalidades Futuras
+
+### 📋 Próxima Feature (Phase 4)
+- [ ] **Persistência com SQLite** - Migrar serviços monitorados para banco de dados
+  - Banco de dados SQLite para armazenamento persistente de serviços
+  - Histórico de status e mudanças de cada serviço
+  - Backup automático de configurações
+  - Melhor performance com muitos serviços
+  - Queries rápidas de histórico
+  
+- [ ] **Gestão de Usuários Admin** - Possibilidade de alterar credenciais do admin
+  - Tela para mudar senha do administrador
+  - Recuperação de senha via email
+  - Log de alterações de credenciais
 
 ### 📋 Em Desenvolvimento
 - [ ] **Notificações via Telegram** - Suporte a Bot do Telegram como alternativa ao Discord
   - Integração com API do Telegram
-  - Autenticação via token de bot
-  - Mensagens formatadas com status dos serviços
+  - Suporte a commands de status via Telegram
   
-- [ ] **Monitoramento de Hosts Remotos (Multi-agent)** - Expandir para maquinas na rede
+- [ ] **Monitoramento de Hosts Remotos (Multi-agent)** - Expandir para máquinas na rede
   - Agente Node.js em hosts remotos
   - Sincronização com servidor central
   - Dashboard unificado com múltiplos hosts
   - Comunicação segura (SSL/TLS)
-  
-- [ ] **Notificações do Windows** - Toast notifications nativas do SO
-  - Integração com Windows Notification System
-  - Cliques na notificação abrem dashboard
 
 ### 🎯 Planejado para Futuro
 - [ ] **Email Notifications** - Suporte a notificações via SMTP
-- [ ] **Database Integration** - Migrar para MongoDB/MySQL para histórico persistente
-- [ ] **Gráficos de Uptime** - Dashboard com estatísticas visuais
+- [ ] **Gráficos de Uptime** - Dashboard com estatísticas visuais e métricas
 - [ ] **Two-Factor Authentication** - 2FA com autenticador mobile
 - [ ] **Role-Based Access Control** - Diferentes níveis de permissão (admin, monitor, viewer)
+- [ ] **Backup & Restore** - Sistema de backup automático das configurações e dados
 
 ## 📋 Pré-requisitos
 
@@ -144,6 +163,7 @@ Para que o monitor consiga iniciar/parar/reiniciar serviços com mais estabilida
    ```powershell
    npm install node-windows
    ```
+   ###### * Já deve estar instalado no projeto pois e um pacote do package.json
 2. Abra o **PowerShell** ou **Prompt de Comando** como **Administrador**  
    (botão direito → "Executar como administrador").
 3. Navegue até a pasta do projeto:
@@ -600,14 +620,15 @@ Tairone Morais
 
 ---
 
-**Última atualização:** 9 de fevereiro de 2026  
-**Versão:** 2.0.0 (Phase 2 - Segurança & Interface)  
+**Última atualização:** 10 de fevereiro de 2026  
+**Versão:** 3.0.0 (Phase 3 - Admin Único & Melhorias)  
 **Status:** ✅ Pronto para Produção
 
 ### Histórico de Versões
 
 | Versão | Data | Destaques |
 |--------|------|----------|
-| 3.0.0 | 09/02/2026 | ✅ Autenticação JWT, Auditoria, Dark Mode, Responsivo |
+| 3.0.0 | 10/02/2026 | ✅ Admin Único, Slider Restart, Badges de Status, Página Registro, CORS |
+| 2.0.0 | 09/02/2026 | ✅ Autenticação JWT, Auditoria, Dark Mode, Responsivo |
 | 2.1.0 | 26/12/2025 | ✅ Interface Web completa, Notificações Discord |
 | 1.0.0 | 01/12/2025 | ✅ Monitor básico em background |
