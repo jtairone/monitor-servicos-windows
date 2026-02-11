@@ -15,6 +15,7 @@ const {
     lerServicesJson,
     salvarServicesJson 
 } = require('./src/funcoes');
+const { getServicesAll, getService, setService, delService } = require('./src/getSets/getSetServices');
 
 // Página principal
 router.get('/', (req, res) => {
@@ -292,10 +293,10 @@ router.get('/api/audit-logs', auth.authMiddleware, async (req, res) => {
 // GET /api/list-services (alias para /api/monitored-services)
 router.get('/api/list-services', auth.authMiddleware, async (req, res) => {
     try {
-        const services = lerServicesJson();
-        const statusMap = await getServicesStatusMap(services.config.map(s => s.name));
+        const services = await getServicesAll()
+        const statusMap = await getServicesStatusMap(services.map(s => s.name));
         
-        const withStatus = services.config.map(s => ({
+        const withStatus = services.map(s => ({
             ...s,
             status: statusMap.get(s.name) || 'unknown'
         }));
@@ -314,23 +315,13 @@ router.post('/api/add-service', auth.authMiddleware, async (req, res) => {
         if (!name || !displayName) {
             return res.status(400).json({ error: 'Nome e displayName são obrigatórios' });
         }
-        const services = lerServicesJson(true);
-        const config = services.config//JSON.parse(data);
-        const servicesPath = services.path;
-        if (!config.services) config.services = [];
-        
-        const exists = config.services.some(s => s.name === name);
+        const services = await getServicesAll();
+        const exists = services.some(s => s.name === name);
         if (exists) {
             return res.status(400).json({ error: 'Serviço já está sendo monitorado' });
         }
-        config.services.push({ 
-            name, 
-            displayName, 
-            restartOnFailure: Boolean(restartOnFailure) 
-        });
-        salvarServicesJson(config, servicesPath);        
+        setService({ name, displayName, restartOnFailure: Boolean(restartOnFailure) });        
         audit.logAction(req.user.username, 'ADD_SERVICE', name, 'success');
-        
         res.json({ success: true, message: 'Serviço adicionado com sucesso' });
     } catch (error) {
         audit.logAction(req.user?.username || 'unknown', 'ADD_SERVICE', '', 'failed');
@@ -345,11 +336,7 @@ router.post('/api/remove-service', auth.authMiddleware, async (req, res) => {
         if (!name) {
             return res.status(400).json({ error: 'Nome do serviço é obrigatório' });
         }
-        const data = lerServicesJson(true);//JSON.parse(data);
-        const servicesPath = data.path;
-        services = data.config.services.filter(s => s.name !== name);
-        data.config.services = services;
-        salvarServicesJson(data.config, servicesPath);
+        await delService(name);
         audit.logAction(req.user.username, 'REMOVE_SERVICE', name, 'success');
         res.json({ success: true, message: 'Serviço removido com sucesso' });
     } catch (error) {

@@ -7,6 +7,7 @@ const logger = require('./logger');
 const {sendDiscordNotification, hook } = require('./sendNotification');
 // Configurações (carregadas dinamicamente do services.json)
 const SERVICES_JSON_PATH = path.join(__dirname, '..', 'data/services.json');
+const { getServicesAll } = require('./getSets/getSetServices');
 
 class ServiceMonitor {
     constructor() {
@@ -21,9 +22,9 @@ class ServiceMonitor {
             const raw = await fs.readFile(SERVICES_JSON_PATH, 'utf8');
             this.config = JSON.parse(raw);
 
-            this.services = this.config.services || [];
+            this.services = await getServicesAll();
             if (this.services.length === 0) {
-                throw new Error('Nenhum serviço configurado no services.json');
+                throw new Error('Nenhum serviço configurado. Verifique o banco de dados.');
             }
             
             logger.info(`Carregados ${this.services.length} serviços para monitoramento`);
