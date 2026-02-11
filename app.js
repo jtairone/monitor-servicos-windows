@@ -3,24 +3,17 @@ const { exec, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const router = require('./router');
+const { lerServicesJson } = require('./src/funcoes');
 
 // Variável global para armazenar o processo do monitor
 let monitorProcess = null;
 
 // Logger simples se não conseguir carregar
 const logger = require('./src/logger');
-
-const config = (() => {
-    try {
-        return JSON.parse(fs.readFileSync(path.join(__dirname, 'services.json'), 'utf8'));
-    } catch {
-        return { servidor: { port: 3000 } };
-    }
-})();
-
+const data = lerServicesJson(true);
 console.log('[2] Criando aplicação Express');
 const app = express();
-const PORT = config.servidor?.port || 3000;
+const PORT = data.config.servidor?.port || 3000;
 console.log('[3] Aplicação criada');
 
 // Middleware

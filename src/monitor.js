@@ -6,7 +6,7 @@ const path = require('path');
 const logger = require('./logger');
 const {sendDiscordNotification, hook } = require('./sendNotification');
 // Configurações (carregadas dinamicamente do services.json)
-const SERVICES_JSON_PATH = path.join(__dirname, '..', 'services.json');
+const SERVICES_JSON_PATH = path.join(__dirname, '..', 'data/services.json');
 
 class ServiceMonitor {
     constructor() {

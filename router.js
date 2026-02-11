@@ -6,7 +6,14 @@ const auth = require('./src/auth');
 const audit = require('./src/audit');
 const { exec, spawn } = require('child_process');
 const logger = require('./src/logger');
-const { runServiceAction, getServicesStatusMap, loginLimiter, serviceLimiter } = require('./src/funcoes');
+const { 
+    runServiceAction, 
+    getServicesStatusMap, 
+    loginLimiter, 
+    serviceLimiter, 
+    lerServicesJson,
+    salvarServicesJson 
+} = require('./src/funcoes');
 
 // Página principal
 router.get('/', (req, res) => {
@@ -62,7 +69,7 @@ router.post('/api/register', loginLimiter, async (req, res) => {
 // API para verificar se admin existe
 router.get('/api/admin-status', async (req, res) => {
     try {
-        const usersFile = path.join(__dirname, 'users.json');
+        const usersFile = path.join(__dirname, './data/users.json');
         let adminExists = false;
         console.log(usersFile);
         
@@ -188,10 +195,9 @@ try {
 // Obter configurações completas (Discord, Monitoramento, Servidor)
 router.get('/api/settings', auth.authMiddleware, auth.adminMiddleware, async (req, res) => {
     try {
-        const data = await fs.readFile(path.join(__dirname, 'services.json'), 'utf8');
-        const fullConfig = JSON.parse(data);
+        const fullConfig = lerServicesJson(true);
         // Removemos a lista de serviços para focar apenas nas definições
-        const { services, ...settings } = fullConfig;
+        const { services, ...settings } = fullConfig.config || {};
         res.json(settings);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -202,10 +208,9 @@ router.get('/api/settings', auth.authMiddleware, auth.adminMiddleware, async (re
 router.post('/api/settings', auth.authMiddleware, auth.adminMiddleware, async (req, res) => {
     try {
         const newSettings = req.body;
-        const filePath = path.join(__dirname, 'services.json');
-        const data = await fs.readFile(filePath, 'utf8');
-        const fullConfig = JSON.parse(data);
-        
+        const config = lerServicesJson(true);//JSON.parse(data);
+        const fullConfig = config.config;
+        const filePath = config.path;
         const fieldMroutering = {
             port: fullConfig.servidor?.port,
             interval: fullConfig.monitoring?.checkInterval,
@@ -256,7 +261,7 @@ router.post('/api/settings', auth.authMiddleware, auth.adminMiddleware, async (r
         }
 
         // Escreve no arquivo
-        await fs.writeFile(filePath, JSON.stringify(updatedConfig, null, 2));
+        salvarServicesJson(updatedConfig, filePath);
         
         // Log de auditoria
         await audit.logAction(req.user.username, 'UPDATE_SETTINGS', { 
@@ -273,168 +278,6 @@ router.post('/api/settings', auth.authMiddleware, auth.adminMiddleware, async (r
         res.status(500).json({ error: error.message });
     }
 });
-
-// API: Carregar discovered-services.json
-/* router.get('/api/discovered-services', auth.authMiddleware, async (req, res) => {
-    try {
-        const discoveredPath = path.join(__dirname, './src/discovered-services.json');
-        const data = await fs.readFile(discoveredPath, 'utf-8');
-        const services = JSON.parse(data);
-        
-        res.json(services);
-    } catch (error) {
-        logger.error('Erro ao carregar discovered-services:', error.message);
-        res.status(500).json({ error: 'Arquivo não encontrado. Execute descoberta primeiro.' });
-    }
-}); */
-
-// API: Carregar services.json (serviços monitorados)
-/* router.get('/api/monitored-services', auth.authMiddleware, async (req, res) => {
-    try {
-        const servicesPath = path.join(__dirname, 'services.json');
-        const data = await fs.readFile(servicesPath, 'utf-8');
-        const config = JSON.parse(data);
-
-        const services = config.services || [];
-        const statusMap = await getServicesStatusMap(services.map(s => s.name));
-
-        const withStatus = services.map(s => ({
-            ...s,
-            status: statusMap.get(s.name) || 'Unknown'
-        }));
-
-        res.json(withStatus);
-    } catch (error) {
-        logger.error('Erro ao carregar services.json:', error.message);
-        res.status(500).json({ error: error.message });
-    }
-}); */
-
-// API: Adicionar serviço ao monitoramento
-/* router.post('/api/add-monitored-service', auth.authMiddleware, async (req, res) => {
-    try {
-        const { name, displayName, restartOnFailure } = req.body;
-        
-        if (!name || !displayName) {
-            return res.status(400).json({ error: 'Nome e displayName são obrigatórios' });
-        }
-        
-        const servicesPath = path.join(__dirname, 'services.json');
-        const data = await fs.readFile(servicesPath, 'utf-8');
-        const config = JSON.parse(data);
-        
-        // Verificar se serviço já existe
-        const exists = config.services.some(s => s.name === name);
-        if (exists) {
-            return res.status(400).json({ error: 'Serviço já está sendo monitorado' });
-        }
-        
-        // Adicionar novo serviço
-        config.services.push({
-            name: name,
-            displayName: displayName,
-            critical: false,
-            description: `Adicionado em ${new Date().toLocaleString('pt-BR')}`,
-            restartOnFailure: Boolean(restartOnFailure)
-        });
-        
-        // Salvar
-        await fs.writeFile(servicesPath, JSON.stringify(config, null, 2));
-        
-        logger.info(`Serviço ${name} adicionado ao monitoramento`);
-        res.json({ 
-            success: true, 
-            message: `Serviço ${displayName} adicionado com sucesso!`,
-            service: config.services[config.services.length - 1]
-        });
-        
-    } catch (error) {
-        logger.error('Erro ao adicionar serviço:', error.message);
-        res.status(500).json({ error: error.message });
-    }
-}); */
-
-// API: Remover serviço do monitoramento
-/* router.delete('/api/monitored-services/:name', auth.authMiddleware, async (req, res) => {
-    try {
-        const { name } = req.params;
-        
-        const servicesPath = path.join(__dirname, 'services.json');
-        const data = await fs.readFile(servicesPath, 'utf-8');
-        const config = JSON.parse(data);
-        
-        // Remover serviço
-        config.services = config.services.filter(s => s.name !== name);
-        
-        // Salvar
-        await fs.writeFile(servicesPath, JSON.stringify(config, null, 2));
-        
-        logger.info(`Serviço ${name} removido do monitoramento`);
-        res.json({ success: true, message: 'Serviço removido com sucesso!' });
-        
-    } catch (error) {
-        logger.error('Erro ao remover serviço:', error.message);
-        res.status(500).json({ error: error.message });
-    }
-}); */
-
-/* router.post('/api/startservice/:serviceName', auth.authMiddleware, serviceLimiter, async (req, res) => {
-    const { serviceName } = req.params;
-    try {
-        const result = await runServiceAction(serviceName, 'start');
-        if (!result) {
-            throw new Error('Falha ao iniciar o serviço');
-        }
-
-        res.json({ success: true, message: `Serviço ${serviceName} iniciado com sucesso!` });
-
-    } catch (error) {
-        logger.error(`Erro ao iniciar serviço ${serviceName}: ${error.message}`);
-        res.status(500).json({ 
-            success: false, 
-            message: `Erro ao iniciar serviço: ${error.message}` 
-        });
-    }
-}); */
-
-/* router.post('/api/stopservice/:serviceName', auth.authMiddleware, serviceLimiter, async (req, res) => {
-    const { serviceName } = req.params;
-    try {
-        const result = await runServiceAction(serviceName, 'stop');
-        if (!result) {
-            throw new Error('Falha ao parar o serviço');
-        }
-
-        res.json({ success: true, message: `Serviço ${serviceName} parado com sucesso!` });
-
-    } catch (error) {
-        console.log(error)
-        logger.error(`Erro ao parar serviço ${serviceName}: ${error.message}`);
-        res.status(500).json({ 
-            success: false, 
-            message: `Erro ao parar serviço: ${error.message}` 
-        });
-    }
-}); */
-
-/* router.post('/api/restartservice/:serviceName', auth.authMiddleware, serviceLimiter, async (req, res) => {
-    const { serviceName } = req.params;
-    try {
-        const result = await runServiceAction(serviceName, 'restart');
-        if (!result) {
-            throw new Error('Falha ao reiniciar o serviço');
-        }
-
-        res.json({ success: true, message: `Serviço ${serviceName} reiniciado com sucesso!` });
-
-    } catch (error) {
-        logger.error(`Erro ao reiniciar serviço ${serviceName}: ${error.message}`);
-        res.status(500).json({ 
-            success: false, 
-            message: `Erro ao reiniciar serviço: ${error.message}` 
-        });
-    }
-}); */
 
 // AUDIT LOGS ENDPOINT
 router.get('/api/audit-logs', auth.authMiddleware, async (req, res) => {
@@ -454,13 +297,10 @@ router.get('/api/audit-logs', auth.authMiddleware, async (req, res) => {
 // GET /api/list-services (alias para /api/monitored-services)
 router.get('/api/list-services', auth.authMiddleware, async (req, res) => {
     try {
-        const servicesPath = path.join(__dirname, 'services.json');
-        const data = await fs.readFile(servicesPath, 'utf-8');
-        const config = JSON.parse(data);
-        const services = config.services || [];
-        const statusMap = await getServicesStatusMap(services.map(s => s.name));
+        const services = lerServicesJson();
+        const statusMap = await getServicesStatusMap(services.config.map(s => s.name));
         
-        const withStatus = services.map(s => ({
+        const withStatus = services.config.map(s => ({
             ...s,
             status: statusMap.get(s.name) || 'unknown'
         }));
@@ -476,29 +316,24 @@ router.get('/api/list-services', auth.authMiddleware, async (req, res) => {
 router.post('/api/add-service', auth.authMiddleware, async (req, res) => {
     try {
         const { name, displayName, restartOnFailure } = req.body;
-        
         if (!name || !displayName) {
             return res.status(400).json({ error: 'Nome e displayName são obrigatórios' });
         }
-        
-        const servicesPath = path.join(__dirname, 'services.json');
-        const data = await fs.readFile(servicesPath, 'utf8');
-        const config = JSON.parse(data);
-        
+        const services = lerServicesJson(true);
+        const config = services.config//JSON.parse(data);
+        const servicesPath = services.path;
         if (!config.services) config.services = [];
         
         const exists = config.services.some(s => s.name === name);
         if (exists) {
             return res.status(400).json({ error: 'Serviço já está sendo monitorado' });
         }
-        
         config.services.push({ 
             name, 
             displayName, 
             restartOnFailure: Boolean(restartOnFailure) 
         });
-        await fs.writeFile(servicesPath, JSON.stringify(config, null, 2));
-        
+        salvarServicesJson(config, servicesPath);        
         audit.logAction(req.user.username, 'ADD_SERVICE', name, 'success');
         
         res.json({ success: true, message: 'Serviço adicionado com sucesso' });
@@ -512,22 +347,15 @@ router.post('/api/add-service', auth.authMiddleware, async (req, res) => {
 router.post('/api/remove-service', auth.authMiddleware, async (req, res) => {
     try {
         const { name } = req.body;
-        
         if (!name) {
             return res.status(400).json({ error: 'Nome do serviço é obrigatório' });
         }
-        
-        const servicesPath = path.join(__dirname, 'services.json');
-        const data = await fs.readFile(servicesPath, 'utf8');
-        const config = JSON.parse(data);
-        
-        if (!config.services) config.services = [];
-        
-        config.services = config.services.filter(s => s.name !== name);
-        await fs.writeFile(servicesPath, JSON.stringify(config, null, 2));
-        
+        const data = lerServicesJson(true);//JSON.parse(data);
+        const servicesPath = data.path;
+        services = data.config.services.filter(s => s.name !== name);
+        data.config.services = services;
+        salvarServicesJson(data.config, servicesPath);
         audit.logAction(req.user.username, 'REMOVE_SERVICE', name, 'success');
-        
         res.json({ success: true, message: 'Serviço removido com sucesso' });
     } catch (error) {
         audit.logAction(req.user?.username || 'unknown', 'REMOVE_SERVICE', '', 'failed');
@@ -579,29 +407,5 @@ router.post('/api/service/restart', auth.authMiddleware, serviceLimiter, async (
         res.status(500).json({ success: false, message: error.message });
     }
 });
-
-// POST /api/update-settings
-/* router.post('/api/update-settings', auth.authMiddleware, auth.adminMiddleware, async (req, res) => {
-    try {
-        const { port, interval, discordWebhookUrl, notifyOnStartup } = req.body;
-        const servicesPath = path.join(__dirname, 'services.json');
-        const data = await fs.readFile(servicesPath, 'utf8');
-        const config = JSON.parse(data);
-        
-        if (port) config.port = port;
-        if (interval) config.interval = interval;
-        if (discordWebhookUrl) config.discordWebhookUrl = discordWebhookUrl;
-        if (typeof notifyOnStartup === 'boolean') config.notifyOnStartup = notifyOnStartup;
-        
-        await fs.writeFile(servicesPath, JSON.stringify(config, null, 2));
-        
-        audit.logAction(req.user.username, 'UPDATE_SETTINGS', 'Sistema', 'success');
-        
-        res.json({ success: true, message: 'Configurações atualizadas com sucesso' });
-    } catch (error) {
-        audit.logAction(req.user?.username || 'unknown', 'UPDATE_SETTINGS', '', 'failed');
-        res.status(500).json({ error: error.message });
-    }
-}); */
 
 module.exports = router;

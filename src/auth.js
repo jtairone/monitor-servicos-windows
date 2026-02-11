@@ -5,7 +5,7 @@ const path = require('path');
 
 const JWT_SECRET = 'your-secret-key-change-in-production-2026';
 const JWT_EXPIRY = '24h';
-const USERS_FILE = path.join(__dirname, '../users.json');
+const USERS_FILE = path.join(__dirname, '../data/users.json');
 
 // Funções de autenticação
 const auth = {
@@ -15,7 +15,6 @@ const auth = {
             // Ler arquivo de usuários
             const data = await fs.readFile(USERS_FILE, 'utf8');
             const users = JSON.parse(data);
-            
             // Procurar usuário
             const user = users.find(u => u.username === username);
             if (!user) {

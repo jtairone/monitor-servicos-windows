@@ -1,5 +1,7 @@
 const { exec, spawn } = require('child_process');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
+const fs = require('fs');
 
 async function getServicesStatusMap(serviceNames) {
     if (!Array.isArray(serviceNames) || serviceNames.length === 0) return new Map();
@@ -128,9 +130,30 @@ const serviceLimiter = rateLimit({
     message: 'Muitas ações. Tente novamente em um momento.'
 });
 
+function lerServicesJson(fullConfig = false) {
+    const servicesPath = path.join(__dirname, '../data/services.json');
+    
+    if(fullConfig){
+        const data = fs.readFileSync(servicesPath, 'utf-8');
+        const config = JSON.parse(data);
+        return { config, path: servicesPath };    
+    }
+    
+    const data = fs.readFileSync(servicesPath, 'utf-8');
+    const config = JSON.parse(data);
+    return { config: config.services || [], path: servicesPath };
+}
+
+function salvarServicesJson(config, filePath) {
+    const json = JSON.stringify(config, null, 2);
+    fs.writeFileSync(filePath, json, 'utf-8');
+}
+
 module.exports = {
     getServicesStatusMap,
     runServiceAction,
     loginLimiter,
-    serviceLimiter
+    serviceLimiter,
+    lerServicesJson,
+    salvarServicesJson
 };
