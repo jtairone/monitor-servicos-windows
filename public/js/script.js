@@ -16,14 +16,20 @@ const secValue = document.getElementById('sec-value');
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', async () => {
+    //console.log('🚀 DOM carregado, iniciando...');
     initTheme();
     await verifyToken();
     setupEventListeners();
+    setupMobileMenu();
+    
+    // Escuta a digitação no campo de intervalo para atualizar a legenda em tempo real
+    if (cfgInterval) {
+        cfgInterval.addEventListener('input', updateIntervalHelper);
+    }
+    
     await loadAuditLogs(); // Carregar logs de auditoria na inicialização
+    //console.log('✅ Inicialização completa');
 });
-
-// Escuta a digitação no campo de intervalo para atualizar a legenda em tempo real
-cfgInterval.addEventListener('input', updateIntervalHelper);
 
 // Atualiza o texto de ajuda (ms para segundos)
 function updateIntervalHelper() {
@@ -71,6 +77,70 @@ async function verifyToken() {
 function getAuthHeader() {
     const token = localStorage.getItem('token');
     return { 'Authorization': `Bearer ${token}` };
+}
+
+// ==========================================
+// MENU MOBILE (HAMBURGER)
+// ==========================================
+
+function setupMobileMenu() {
+    //('📱 Configurando menu mobile...');
+    const hamburgerMenu = document.getElementById('hamburgerMenu');
+    const sidebar = document.getElementById('sidebar');
+    const navItems = document.querySelectorAll('.nav-item');
+
+    //console.log('Hamburger:', hamburgerMenu, 'Sidebar:', sidebar, 'NavItems:', navItems.length);
+
+    if (!hamburgerMenu || !sidebar) {
+        console.warn('❌ Hamburger menu ou sidebar não encontrados');
+        return;
+    }
+
+    // Toggle menu ao clicar no hamburger
+    hamburgerMenu.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+       // console.log('🍔 Hamburger clicado');
+        hamburgerMenu.classList.toggle('active');
+        sidebar.classList.toggle('active');
+        document.body.classList.toggle('menu-open');
+        const isActive = hamburgerMenu.classList.contains('active');
+       // console.log('Menu ativo?', isActive);
+       // console.log('Sidebar esquerda:', window.getComputedStyle(sidebar).left);
+    });
+
+    // Fechar menu ao clicar em um item da navegação
+    navItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.stopPropagation();
+          //  console.log('📋 Item de navegação clicado');
+            hamburgerMenu.classList.remove('active');
+            sidebar.classList.remove('active');
+            document.body.classList.remove('menu-open');
+        });
+    });
+
+    // Fechar menu ao clicar fora dele (em telas pequenas)
+    document.addEventListener('click', (e) => {
+        if (window.innerWidth <= 768) {
+            if (!sidebar.contains(e.target) && !hamburgerMenu.contains(e.target)) {
+                hamburgerMenu.classList.remove('active');
+                sidebar.classList.remove('active');
+                document.body.classList.remove('menu-open');
+            }
+        }
+    });
+
+    // Fechar menu ao redimensionar a janela
+    window.addEventListener('resize', () => {
+        if (window.innerWidth > 768) {
+            hamburgerMenu.classList.remove('active');
+            sidebar.classList.remove('active');
+            document.body.classList.remove('menu-open');
+        }
+    });
+    
+   // console.log('✅ Menu mobile configurado');
 }
 
 // ==========================================
@@ -165,7 +235,15 @@ function hideLoading() {
 
 function setupEventListeners() {
     // Theme toggle
-    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) {
+        themeToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleTheme();
+        });
+    } else {
+        console.warn('themeToggle não encontrado');
+    }
 
     // Tab navigation
     document.querySelectorAll('.nav-item').forEach(btn => {
@@ -173,19 +251,34 @@ function setupEventListeners() {
     });
 
     // Discover tab
-    document.getElementById('discoverBtn').addEventListener('click', discoverServices);
+    const discoverBtn = document.getElementById('discoverBtn');
+    if (discoverBtn) {
+        discoverBtn.addEventListener('click', discoverServices);
+    }
 
     // Monitored tab
-    document.getElementById('refreshMonitoredBtn').addEventListener('click', loadMonitoredServices);
+    const refreshMonitoredBtn = document.getElementById('refreshMonitoredBtn');
+    if (refreshMonitoredBtn) {
+        refreshMonitoredBtn.addEventListener('click', loadMonitoredServices);
+    }
 
     // Audit tab
-    document.getElementById('refreshAuditBtn').addEventListener('click', loadAuditLogs);
+    const refreshAuditBtn = document.getElementById('refreshAuditBtn');
+    if (refreshAuditBtn) {
+        refreshAuditBtn.addEventListener('click', loadAuditLogs);
+    }
 
     // Settings tab
-    document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+    const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+    if (saveSettingsBtn) {
+        saveSettingsBtn.addEventListener('click', saveSettings);
+    }
 
     // Logout
-    document.getElementById('logoutBtn').addEventListener('click', logout);
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', logout);
+    }
 
     // Search filters
     /* const searchInput = document.getElementById('searchInput');
@@ -227,6 +320,7 @@ function toggleTheme() {
     const theme = isDark ? 'dark' : 'light';
     localStorage.setItem('theme', theme);
     updateThemeIcon(isDark);
+  //  console.log('🌙 Tema alterado para:', theme);
 }
 
 // ==========================================
@@ -852,7 +946,7 @@ function updateStats() {
 }
 
 function filterServices() {
-    console.log('Filtering services with search term and status filter');
+   // console.log('Filtering services with search term and status filter');
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     const statusFilter = document.getElementById('statusFilter').value;
 
@@ -860,7 +954,7 @@ function filterServices() {
         (s.name.toLowerCase().includes(searchTerm) || s.displayName.toLowerCase().includes(searchTerm)) &&
         (!statusFilter || s.status === statusFilter)
     );
-    console.log('Filtered services:', filtered);
+  // console.log('Filtered services:', filtered);
     renderServicesList(filtered);
 }
 

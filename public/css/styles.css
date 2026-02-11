@@ -73,6 +73,7 @@ body {
     overflow-y: auto;
     z-index: 999;
     box-shadow: var(--shadow-sm);
+    transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar-brand {
@@ -1144,4 +1145,194 @@ body.dark-mode input:checked + .slider {
 .toggle-group span {
     color: var(--text-dark);
     user-select: none;
+}
+
+/* ==========================================
+   MENU HAMBURGER (RESPONSIVO)
+   ========================================== */
+
+.hamburger-menu {
+    display: none;
+    flex-direction: column;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    gap: 6px;
+    padding: 8px;
+    margin-right: 15px;
+    z-index: 1000;
+}
+
+.hamburger-menu:hover {
+    opacity: 0.7;
+}
+
+.hamburger-menu span {
+    width: 25px;
+    height: 3px;
+    background-color: var(--text-dark);
+    border-radius: 2px;
+    transition: all 0.3s ease;
+    display: block;
+}
+
+body.dark-mode .hamburger-menu span {
+    background-color: var(--text-dark);
+}
+
+.hamburger-menu.active span:nth-child(1) {
+    transform: rotate(45deg) translate(10px, 10px);
+}
+
+.hamburger-menu.active span:nth-child(2) {
+    opacity: 0;
+}
+
+.hamburger-menu.active span:nth-child(3) {
+    transform: rotate(-45deg) translate(7px, -7px);
+}
+
+/* ==========================================
+   RESPONSIVO - TABLETS E CELULARES
+   ========================================== */
+
+@media (max-width: 768px) {
+    .hamburger-menu {
+        display: flex;
+    }
+
+    .sidebar {
+        width: 280px !important;
+        left: -280px !important;
+        z-index: 9999 !important;
+        overflow: visible !important;
+        visibility: visible !important;
+        transform: translateX(0) !important;
+        position: fixed !important;
+        height: 100vh !important;
+        top: 0 !important;
+        border-right: 1px solid var(--border) !important;
+    }
+
+    .sidebar.active {
+        left: 0 !important;
+    }
+
+    /* Overlay semi-transparente ao abrir menu */
+    body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+        z-index: 9998;
+    }
+
+    body.menu-open::before {
+        opacity: 1;
+        pointer-events: all;
+    }
+
+    .main-content {
+        margin-left: 0;
+        padding: 20px;
+    }
+
+    .top-bar {
+        gap: 15px;
+    }
+
+    .page-title h1 {
+        font-size: 20px;
+    }
+
+    .page-title p {
+        font-size: 12px;
+    }
+
+    .header-actions {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .stats-cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .sidebar {
+        padding: 15px;
+    }
+
+    .sidebar-brand {
+        margin-bottom: 5px;
+    }
+
+    .logo-box {
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
+    }
+
+    .sidebar-brand span {
+        font-size: 16px;
+    }
+
+    .nav-item {
+        font-size: 14px;
+        padding: 10px;
+    }
+
+    .nav-item i {
+        font-size: 16px;
+    }
+
+    .user-info {
+        gap: 8px;
+    }
+
+    .user-avatar {
+        width: 35px;
+        height: 35px;
+        font-size: 16px;
+    }
+
+    .user-name {
+        font-size: 12px;
+    }
+
+    .user-role {
+        font-size: 10px;
+    }
+
+    .page-title h1 {
+        font-size: 18px;
+    }
+
+    .page-title p {
+        font-size: 11px;
+    }
+
+    .stat-card {
+        padding: 10px;
+        font-size: 12px;
+    }
+
+    .stat-value {
+        font-size: 16px;
+    }
+
+    .theme-toggle {
+        width: 35px;
+        height: 35px;
+        font-size: 16px;
+    }
 }
