@@ -10,7 +10,6 @@ yarn.lock
 
 # Configuração sensível
 data/services.json
-data/users.json
 src/discovered-services.json
 
 # Logs
@@ -45,3 +44,6 @@ discovered-services.json
 
 # Ignorar arquivos específicos
 daemon/
+
+#Banco de dados
+src/database/banco.sqlite

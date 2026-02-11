@@ -6,6 +6,7 @@ const auth = require('./src/auth');
 const audit = require('./src/audit');
 const { exec, spawn } = require('child_process');
 const logger = require('./src/logger');
+const { getUsers } = require('./src/getSets/getSetUsers');
 const { 
     runServiceAction, 
     getServicesStatusMap, 
@@ -69,18 +70,15 @@ router.post('/api/register', loginLimiter, async (req, res) => {
 // API para verificar se admin existe
 router.get('/api/admin-status', async (req, res) => {
     try {
-        const usersFile = path.join(__dirname, './data/users.json');
         let adminExists = false;        
         try {
-            const data = await fs.readFile(usersFile, 'utf8');
-            const users = JSON.parse(data);
+            const users = await getUsers();
             adminExists = users.length > 0;
         } catch (error) {
             // Arquivo não existe ainda
             console.log(error);
             adminExists = false;
         }
-        
         res.json({ adminExists });
     } catch (error) {
         res.json({ adminExists: false });

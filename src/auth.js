@@ -2,10 +2,10 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const fs = require('fs').promises;
 const path = require('path');
+const { setUsers, getUsers } = require('./getSets/getSetUsers');
 
-const JWT_SECRET = 'your-secret-key-change-in-production-2026';
+const JWT_SECRET = '!hjj*!a7S.YEnc2ivQfJ959s8@#%$^&*()_+';
 const JWT_EXPIRY = '24h';
-const USERS_FILE = path.join(__dirname, '../data/users.json');
 
 // Funções de autenticação
 const auth = {
@@ -13,8 +13,7 @@ const auth = {
     async login(username, password) {
         try {
             // Ler arquivo de usuários
-            const data = await fs.readFile(USERS_FILE, 'utf8');
-            const users = JSON.parse(data);
+            const users = await getUsers();
             // Procurar usuário
             const user = users.find(u => u.username === username);
             if (!user) {
@@ -62,15 +61,7 @@ const auth = {
             }
             
             // Ler arquivo de usuários
-            let users = [];
-            try {
-                const data = await fs.readFile(USERS_FILE, 'utf8');
-                users = JSON.parse(data);
-            } catch (error) {
-                // Se arquivo não existe, criar array vazio
-                users = [];
-            }
-            
+            const users = await getUsers();
             // Verificar se já existe algum usuário (apenas um admin permitido)
             if (users.length > 0) {
                 return { 
@@ -82,18 +73,7 @@ const auth = {
             
             // Hash da senha
             const hashedPassword = await bcrypt.hash(password, 10);
-            
-            // Adicionar novo usuário com role de admin
-            users.push({
-                username: username,
-                password: hashedPassword,
-                role: 'admin',
-                createdAt: new Date().toISOString()
-            });
-            
-            // Salvar arquivo de usuários
-            await fs.writeFile(USERS_FILE, JSON.stringify(users, null, 2));
-            
+            setUsers({ username, password: hashedPassword, role: 'admin' });
             return {
                 success: true,
                 message: 'Administrador registrado com sucesso!'
