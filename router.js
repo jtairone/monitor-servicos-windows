@@ -70,13 +70,10 @@ router.post('/api/register', loginLimiter, async (req, res) => {
 router.get('/api/admin-status', async (req, res) => {
     try {
         const usersFile = path.join(__dirname, './data/users.json');
-        let adminExists = false;
-        console.log(usersFile);
-        
+        let adminExists = false;        
         try {
             const data = await fs.readFile(usersFile, 'utf8');
             const users = JSON.parse(data);
-            console.log(users.length);
             adminExists = users.length > 0;
         } catch (error) {
             // Arquivo não existe ainda

@@ -9,7 +9,8 @@ yarn.lock
 .env.*.local
 
 # Configuração sensível
-services.json
+data/services.json
+data/users.json
 src/discovered-services.json
 
 # Logs
