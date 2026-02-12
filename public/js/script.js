@@ -864,10 +864,13 @@ async function loadSettings() {
         const settings = await response.json();
         
         // Popular os campos com os valores do servidor
-        document.getElementById('cfg-port').value = settings.servidor?.port || 3000;
-        document.getElementById('cfg-interval').value = settings.monitoring?.checkInterval || 30000;
-        document.getElementById('cfg-discord-url').value = settings.discord?.webhookUrl || '';
-        document.getElementById('cfg-discord-startup').checked = settings.discord?.sendStartupMessage || false;
+        document.getElementById('cfg-port').value = settings?.servidor_porta || 3000;
+        document.getElementById('cfg-interval').value = settings?.monitoring_check_interval || 30000;
+        document.getElementById('cfg-discord-url').value = settings?.discord_webhook_url || '';
+        document.getElementById('cfg-discord-startup').checked = settings?.discord_send_startup || false;
+        document.getElementById('cfg-discord-recovery').checked = settings?.discord_notify_recovery || false;
+        document.getElementById('cfg-max-retries').value = settings?.monitoring_max_retries || 3;
+        document.getElementById('cfg-log-level').value = settings?.monitoring_log_level || 'info';
         updateIntervalHelper();
         hideLoading();
     } catch (error) {
@@ -885,9 +888,12 @@ async function saveSettings() {
         const interval = document.getElementById('cfg-interval').value;
         const discordUrl = document.getElementById('cfg-discord-url').value;
         const discordStartup = document.getElementById('cfg-discord-startup').checked;
+        const discordRecovery = document.getElementById('cfg-discord-recovery').checked;
+        const maxRetries = document.getElementById('cfg-max-retries').value;
+        const logLevel = document.getElementById('cfg-log-level').value;
 
-        if (!port || !interval) {
-            showToast('Porta e Intervalo são obrigatórios', 'warning');
+        if (!port || !interval || !maxRetries) {
+            showToast('Porta, Intervalo e Máximo de Tentativas são obrigatórios', 'warning');
             return;
         }
 
@@ -907,7 +913,10 @@ async function saveSettings() {
                 port: parseInt(port),
                 interval: parseInt(interval),
                 discordWebhookUrl: discordUrl || null,
-                notifyOnStartup: discordStartup
+                notifyOnStartup: discordStartup,
+                notifyOnRecovery: discordRecovery,
+                maxRetries: parseInt(maxRetries),
+                logLevel: logLevel
             })
         });
 

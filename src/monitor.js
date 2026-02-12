@@ -5,31 +5,28 @@ const fs = require('fs').promises;
 const path = require('path');
 const logger = require('./logger');
 const {sendDiscordNotification, hook } = require('./sendNotification');
-// Configurações (carregadas dinamicamente do services.json)
-const SERVICES_JSON_PATH = path.join(__dirname, '..', 'data/services.json');
 const { getServicesAll } = require('./getSets/getSetServices');
+const { getConfig } = require('./getSets/getSetConfig');
 
 class ServiceMonitor {
     constructor() {
         this.services = [];
         this.serviceStatus = new Map();
         this.retryCount = new Map();
-        this.config = { monitoring: { checkInterval: 30000, maxRetries: 3 }, discord: {} };
+        this.config = { monitoring_check_interval: 30000, monitoring_max_retries: 3, discord_webhook_url: '' };
     }
 
     async loadServices() {
         try {
-            const raw = await fs.readFile(SERVICES_JSON_PATH, 'utf8');
-            this.config = JSON.parse(raw);
-
+            this.config = await getConfig();
             this.services = await getServicesAll();
             if (this.services.length === 0) {
                 throw new Error('Nenhum serviço configurado. Verifique o banco de dados.');
             }
             
             logger.info(`Carregados ${this.services.length} serviços para monitoramento`);
-            if (this.config?.discord?.webhookUrl) {
-                logger.info(`Webhook URL: ${this.config.discord.webhookUrl.substring(0, 50)}...`);
+            if (this.config?.discord_webhook_url) {
+                logger.info(`Webhook Discord URL: ${this.config.discord_webhook_url.substring(0, 50)}...`);
             }
             
             // Inicializar status
@@ -202,9 +199,9 @@ if %ERRORLEVEL% equ 0 (
                     const retries = this.retryCount.get(serviceConfig.name) + 1;
                     this.retryCount.set(serviceConfig.name, retries);
                     
-                    logger.warn(`🔴 Serviço ${serviceConfig.name} PAROU! Tentativa ${retries}/${this.config.monitoring.maxRetries}`);
+                    logger.warn(`🔴 Serviço ${serviceConfig.name} PAROU! Tentativa ${retries}/${this.config.monitoring_max_retries}`);
                     
-                    if (retries <= this.config.monitoring.maxRetries) {
+                    if (retries <= this.config.monitoring_max_retries) {
                         logger.info(`🔄 Tentando reiniciar ${serviceConfig.name}...`);
                         const success = await this.attemptRestart(serviceConfig.name, serviceConfig.displayName);
                         
@@ -235,34 +232,46 @@ if %ERRORLEVEL% equ 0 (
     async start() {
         try {
             await this.loadServices();
+            // Garantir que o hook está inicializado com a URL correta
+            if (this.config?.discord_webhook_url) {
+                const { hook: discordHook } = require('./sendNotification');
+                if (!discordHook) {
+                    const { initializeHook } = require('./sendNotification');
+                    await initializeHook?.();
+                }
+            }
             
             // Enviar mensagem de inicialização
-            if (this.services.length > 0 && this.services) {
+            if (this.services.length > 0 && this.services && this.config?.discord_webhook_url) {
                 try {
-                    const hostname = os.hostname();
-                    const servicesList = this.services
-                        .map(s => `• ${s.displayName || s.name}`)
-                        .join('\n');
-                    
-                    const embed = new MessageBuilder()
-                        .setTitle('🚀 Service Monitor Iniciado')
-                        .setDescription(`Monitorando **${this.services.length}** serviços no servidor`)
-                        .addField('📡 Servidor', hostname || 'Unknown', true)
-                        .addField('⏰ Iniciado em', new Date().toLocaleString('pt-BR'), true)
-                        .addField('👁️ Serviços Monitorados', servicesList || 'Nenhum', false)
-                        .setColor('#0099ff')
-                        .setFooter('Service Monitor v1.0')
-                        .setTimestamp();
-                    
-                    await hook.send(embed);
-                    logger.info('Mensagem de inicialização enviada para Discord');
+                    const { hook: discordHook } = require('./sendNotification');
+                    if (discordHook) {
+                        const hostname = os.hostname();
+                        const servicesList = this.services
+                            .map(s => `• ${s.displayName || s.name}`)
+                            .join('\n');
+                        const embed = new MessageBuilder()
+                            .setTitle('🚀 Service Monitor Iniciado')
+                            .setDescription(`Monitorando **${this.services.length}** serviços no servidor`)
+                            .addField('📡 Servidor', hostname || 'Unknown', true)
+                            .addField('⏰ Iniciado em', new Date().toLocaleString('pt-BR'), true)
+                            .addField('👁️ Serviços Monitorados', servicesList || 'Nenhum', false)
+                            .setColor('#0099ff')
+                            .setFooter('Service Monitor v3.0')
+                            .setTimestamp();
+                        
+                        await discordHook.send(embed);
+                        logger.info('Mensagem de inicialização enviada para Discord');
+                    } else {
+                        logger.warn('Webhook Discord não está disponível para mensagem de inicialização');
+                    }
                 } catch (error) {
                     logger.error('Erro ao enviar mensagem de inicialização:', error.message);
                 }
             }
             
             logger.info(`Iniciando monitoramento de ${this.services.length} serviços`);
-            logger.info(`Intervalo de verificação: ${this.config.monitoring.checkInterval / 1000} segundos`);
+            logger.info(`Intervalo de verificação: ${this.config.monitoring_check_interval / 1000} segundos`);
             
             // Verificar todos os serviços imediatamente
             logger.info('▶️  Executando primeira verificação...');
@@ -291,12 +300,12 @@ if %ERRORLEVEL% equ 0 (
                 
                 logger.info(`✅ Verificação #${checkCount} concluída\n`);
 
-                const interval = this.config?.monitoring?.checkInterval || 30000;
+                const interval = this.config?.monitoring_check_interval || 30000;
                 setTimeout(loop, interval);
             };
 
             // Inicia o loop dinâmico
-            setTimeout(loop, this.config.monitoring.checkInterval);
+            setTimeout(loop, this.config.monitoring_check_interval);
             
             logger.info('Monitor em execução. Pressione Ctrl+C para parar.');
             

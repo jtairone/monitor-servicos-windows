@@ -3,60 +3,80 @@ const { exec, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const router = require('./router');
-const { lerServicesJson } = require('./src/funcoes');
+const { getConfig } = require('./src/getSets/getSetConfig');
 
 // Variável global para armazenar o processo do monitor
 let monitorProcess = null;
 
 // Logger simples se não conseguir carregar
 const logger = require('./src/logger');
-const data = lerServicesJson(true);
-console.log('[2] Criando aplicação Express');
-const app = express();
-const PORT = data.config.servidor?.port || 3000;
-console.log('[3] Aplicação criada');
 
-// Middleware
-console.log('[4] Configurando middlewares');
-app.use(express.json());
-app.use(express.static('public'));
+// Função async para inicializar a aplicação
+async function initializeApp() {
+    try {
+        console.log('[1] Carregando configurações...');
+        const dataConfig = await getConfig();
+        
+        //console.log(`Data carregada:`, dataConfig);
+        console.log('[2] Criando aplicação Express');
+        const app = express();
+        
+        // ✅ Usar a porta do banco de dados com fallback
+        const PORT = dataConfig?.servidor_porta || 3000;
+        console.log(`[3] Porta configurada: ${PORT}`);
+        console.log('[3] Aplicação criada');
 
-// Configurar CORS
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    
-    // Responder a preflight requests
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
+        // Middleware
+        console.log('[4] Configurando middlewares');
+        app.use(express.json());
+        app.use(express.static('public'));
+
+        // Configurar CORS
+        app.use((req, res, next) => {
+            res.header('Access-Control-Allow-Origin', '*');
+            res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+            res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+            
+            // Responder a preflight requests
+            if (req.method === 'OPTIONS') {
+                return res.sendStatus(200);
+            }
+            
+            next();
+        });
+
+        console.log('[5] Middlewares configurados');
+
+        // Rotas de autenticação
+        console.log('[6] Configurando rotas');
+        app.use('/', router);
+
+        // Iniciar servidor
+        console.log('[7] Iniciando servidor...');
+        const server = app.listen(PORT, () => {
+            console.log(`✅ Servidor rodando em http://localhost:${PORT}`);
+            logger.info(`🌐 Servidor rodando em http://localhost:${PORT}`);
+            logger.info(`Abra seu navegador e acesse http://localhost:${PORT}`);
+            
+            // Iniciar monitor.js automaticamente após o servidor estar pronto
+            console.log('[8] Iniciando Monitor de Serviços...');
+            startMonitor();
+        });
+
+        server.on('error', (err) => {
+            console.error('❌ Erro ao iniciar servidor:', err.message);
+            process.exit(1);
+        });
+        
+    } catch (error) {
+        console.error('❌ Erro ao inicializar aplicação:', error.message);
+        logger.error('Erro ao inicializar aplicação:', error.message);
+        process.exit(1);
     }
-    
-    next();
-});
+}
 
-console.log('[5] Middlewares configurados');
-
-// Rotas de autenticação
-console.log('[6] Configurando rotas');
-app.use('/', router);
-
-// Iniciar servidor
-console.log('[7] Iniciando servidor...');
-const server = app.listen(PORT, () => {
-    console.log(`✅ Servidor rodando em http://localhost:${PORT}`);
-    logger.info(`🌐 Servidor rodando em http://localhost:${PORT}`);
-    logger.info(`Abra seu navegador e acesse http://localhost:${PORT}`);
-    
-    // Iniciar monitor.js automaticamente após o servidor estar pronto
-    console.log('[8] Iniciando Monitor de Serviços...');
-    startMonitor();
-});
-
-server.on('error', (err) => {
-    console.error('❌ Erro ao iniciar servidor:', err.message);
-    process.exit(1);
-});
+// ✅ Chamar a função async
+initializeApp();
 
 // Função para iniciar o monitor.js como processo filho
 function startMonitor() {

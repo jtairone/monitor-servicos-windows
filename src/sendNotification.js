@@ -1,30 +1,54 @@
-//const fs = require('fs');
 const os = require('os');
 const { Webhook, MessageBuilder } = require('discord-webhook-node');
 const logger = require('./logger');
-const CONFIG = require('../data/services.json');
+const { getConfig } = require('./getSets/getSetConfig');
+const { getServicesAll } = require('./getSets/getSetServices');
 
-// Validar services
-if (!CONFIG.services || typeof CONFIG.services !== 'object') {
-    throw new Error('Serviços para monitorar não configurado em services.json');
+// ✅ CRIAR HOOK COMO NULL INICIALMENTE
+let hook = null;
+
+// ✅ FUNÇÃO PARA INICIALIZAR O HOOK
+async function initializeHook() {
+    try {
+        const CONFIG = await getConfig();
+        if (CONFIG?.discord_webhook_url) {
+            hook = new Webhook(CONFIG.discord_webhook_url);
+            hook.setUsername('Windows Service Monitor');
+            logger.info('Webhook Discord inicializado com sucesso');
+        }
+    } catch (error) {
+        logger.error('Erro ao inicializar webhook:', error.message);
+        hook = null;
+    }
 }
-// Validar webhook URL
-if (!CONFIG.discord.webhookUrl || typeof CONFIG.discord.webhookUrl !== 'string') {
-    throw new Error('Webhook URL do Discord não configurado em services.json');
-}
 
-const services = CONFIG.services || [];
-const servicesStatus = new Map();
-const retryCount = new Map();
-//const IMAGE_URL = 'https://api.redux.ind.br:2096/img/logofolha_redux.png';
-// Inicializar webhook do Discord
-const hook = new Webhook(CONFIG.discord.webhookUrl);
-hook.setUsername('Windows Service Monitor');
-//hook.setAvatar(IMAGE_URL);
-
+// ✅ INICIALIZAR AUTOMATICAMENTE
+(async () => {
+    await initializeHook();
+})();
 
 async function sendDiscordNotification(serviceConfig, oldStatus, newStatus) {
         try {
+            const CONFIG = await getConfig();
+            const SERVICES = await getServicesAll();
+            
+            // ✅ VERIFICAR SE O HOOK PRECISA SER RECRIADO
+            if (!hook || hook.webhookUrl !== CONFIG.discord_webhook_url) {
+                await initializeHook();
+                if (!hook) {
+                    throw new Error('Não foi possível inicializar webhook');
+                }
+            }
+            
+            // Validar services
+            if (!SERVICES || typeof SERVICES !== 'object') {
+                throw new Error('Serviços para monitorar não configurados');
+            }
+            // Validar webhook URL
+            if (!CONFIG.discord_webhook_url || typeof CONFIG.discord_webhook_url !== 'string') {
+                throw new Error('Webhook URL do Discord não configurado');
+            }
+
             if (!hook) {
                 logger.warn('Webhook não inicializado');
                 return;
@@ -45,7 +69,7 @@ async function sendDiscordNotification(serviceConfig, oldStatus, newStatus) {
                     .addField('⏰ Horário', timestamp, true)
                     .addField('🔄 Status Anterior', oldStatus && oldStatus.running ? 'Rodando' : 'Parado', true)
                     .setColor('#00ff00')
-                    .setFooter('Service Monitor v1.0')
+                    .setFooter('Service Monitor v3.0')
                     .setTimestamp();
             } else {
                 // Serviço parou
@@ -56,7 +80,7 @@ async function sendDiscordNotification(serviceConfig, oldStatus, newStatus) {
                     .addField('⏰ Horário', timestamp, true)
                     .addField('🔧 Status', newStatus.status || 'stopped', true)
                     .setColor('#ff0000')
-                    .setFooter('Service Monitor v1.0')
+                    .setFooter('Service Monitor v3.0')
                     .setTimestamp();
                 
                 if (newStatus.error) {
@@ -72,4 +96,6 @@ async function sendDiscordNotification(serviceConfig, oldStatus, newStatus) {
         }
   }
   //sendDiscordNotification({ name: 'Example Service', displayName: 'Serviço Exemplo' }, { running: false }, { running: true });
-  module.exports = { sendDiscordNotification, hook };
+  
+  // ✅ EXPORTAR EXATAMENTE COMO ERA ANTES
+  module.exports = { sendDiscordNotification, hook, initializeHook };

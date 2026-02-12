@@ -11,11 +11,10 @@ const {
     runServiceAction, 
     getServicesStatusMap, 
     loginLimiter, 
-    serviceLimiter, 
-    lerServicesJson,
-    salvarServicesJson 
+    serviceLimiter
 } = require('./src/funcoes');
 const { getServicesAll, getService, setService, delService } = require('./src/getSets/getSetServices');
+const { getConfig, setUpdateConfig } = require('./src/getSets/getSetConfig');
 
 // Página principal
 router.get('/', (req, res) => {
@@ -191,9 +190,9 @@ try {
 // Obter configurações completas (Discord, Monitoramento, Servidor)
 router.get('/api/settings', auth.authMiddleware, auth.adminMiddleware, async (req, res) => {
     try {
-        const fullConfig = lerServicesJson(true);
+        const settings = await getConfig();
         // Removemos a lista de serviços para focar apenas nas definições
-        const { services, ...settings } = fullConfig.config || {};
+        //const { services, ...settings } = fullConfig.config || {};
         res.json(settings);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -203,72 +202,38 @@ router.get('/api/settings', auth.authMiddleware, auth.adminMiddleware, async (re
 // Salvar configurações
 router.post('/api/settings', auth.authMiddleware, auth.adminMiddleware, async (req, res) => {
     try {
-        const newSettings = req.body;
-        const config = lerServicesJson(true);//JSON.parse(data);
-        const fullConfig = config.config;
-        const filePath = config.path;
+        const { 
+            discordWebhookUrl, 
+            interval, 
+            notifyOnStartup, 
+            notifyOnRecovery,
+            maxRetries,
+            logLevel,
+            port 
+        } = req.body;
+        
         const fieldMroutering = {
-            port: fullConfig.servidor?.port,
-            interval: fullConfig.monitoring?.checkInterval,
-            discordWebhookUrl: fullConfig.discord?.webhookUrl,
-            notifyOnStartup: fullConfig.discord?.sendStartupMessage
+            servidor_porta: port || 3001,
+            monitoring_check_interval: interval || 30000,
+            discord_webhook_url: discordWebhookUrl || '',
+            discord_send_startup: notifyOnStartup || true,
+            discord_notify_recovery: notifyOnRecovery || true,
+            monitoring_max_retries: maxRetries || 3,
+            monitoring_log_level: logLevel || 'info'
         };
         
-        // Converte os dados achatados para estrutura aninhada
-        const Alterados = {};
-        const updatedConfig = JSON.parse(JSON.stringify(fullConfig)); // Deep clone
-
-        // Detecta o que foi alterado
-        Object.keys(newSettings).forEach(key => {
-            const newValue = newSettings[key];
-            const oldValue = fieldMroutering[key];
-            
-            if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
-                Alterados[key] = { old: oldValue, new: newValue };
-            }
-        });
-
-        // Aplica as alterações no updatedConfig
-        Object.keys(Alterados).forEach(key => {
-            const newValue = Alterados[key].new;
-            switch (key) { 
-                case 'port':
-                    updatedConfig.servidor.port = newValue;
-                    break;
-                case 'interval': 
-                    updatedConfig.monitoring.checkInterval = newValue;
-                    break;
-                case 'discordWebhookUrl':
-                    updatedConfig.discord.webhookUrl = newValue;
-                    break;
-                case 'notifyOnStartup': 
-                    updatedConfig.discord.sendStartupMessage = newValue;
-                    break;
-                default:
-                    break;
-            }
-        });
-        // Se não houve alterações
-        if (Object.keys(Alterados).length === 0) {
-            return res.json({ 
-                success: true, 
-                message: "Nenhuma alteração detectada" 
-            });
-        }
-
         // Escreve no arquivo
-        salvarServicesJson(updatedConfig, filePath);
-        
+        setUpdateConfig(fieldMroutering);
         // Log de auditoria
         await audit.logAction(req.user.username, 'UPDATE_SETTINGS', { 
-            changes: Alterados,
+            changes: req.body,
             ip: req.ip 
         });
         
         res.json({ 
             success: true, 
             message: "Configurações salvas! Reinicie o servidor para aplicar os novos parâmetros.",
-            changes: Alterados
+            changes: req.body
         });
     } catch (error) {
         res.status(500).json({ error: error.message });

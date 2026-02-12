@@ -130,7 +130,7 @@ const serviceLimiter = rateLimit({
     message: 'Muitas ações. Tente novamente em um momento.'
 });
 
-function lerServicesJson(fullConfig = false) {
+/* function lerServicesJson(fullConfig = false) {
     const servicesPath = path.join(__dirname, '../data/services.json');
     
     if(fullConfig){
@@ -142,18 +142,16 @@ function lerServicesJson(fullConfig = false) {
     const data = fs.readFileSync(servicesPath, 'utf-8');
     const config = JSON.parse(data);
     return { config: config.services || [], path: servicesPath };
-}
+} */
 
-function salvarServicesJson(config, filePath) {
+/* function salvarServicesJson(config, filePath) {
     const json = JSON.stringify(config, null, 2);
     fs.writeFileSync(filePath, json, 'utf-8');
-}
+} */
 
 module.exports = {
     getServicesStatusMap,
     runServiceAction,
     loginLimiter,
-    serviceLimiter,
-    lerServicesJson,
-    salvarServicesJson
+    serviceLimiter
 };
