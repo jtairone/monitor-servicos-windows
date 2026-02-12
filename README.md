@@ -19,7 +19,7 @@ Uma aplicação completa Node.js + Express que monitora serviços do Windows e e
 - ✅ **Notificações Discord** - Embeds bonitos e informativos
 - ✅ **Reinício Automático** - Reinicia serviços com falha (configurável)
 - ✅ **Sistema de Logs** - Rastreamento completo com Winston
-- ✅ **Configuração JSON** - Fácil de customizar
+- ✅ **Banco de Dados SQLite** - Armazenamento persistente de serviços, configurações e auditoria (não mais JSON)
 - ✅ **Responsivo** - Funciona em desktop, tablet e mobile
 
 ## 🔐 Funcionalidades Phase 2 (Segurança)
@@ -50,13 +50,6 @@ Uma aplicação completa Node.js + Express que monitora serviços do Windows e e
 ## 🗺️ Roadmap - Funcionalidades Futuras
 
 ### 📋 Próxima Feature (Phase 4)
-- [ ] **Persistência com SQLite** - Migrar serviços monitorados para banco de dados
-  - Banco de dados SQLite para armazenamento persistente de serviços
-  - Histórico de status e mudanças de cada serviço
-  - Backup automático de configurações
-  - Melhor performance com muitos serviços
-  - Queries rápidas de histórico
-  
 - [ ] **Gestão de Usuários Admin** - Possibilidade de alterar credenciais do admin
   - Tela para mudar senha do administrador
   - Recuperação de senha via email
@@ -104,58 +97,22 @@ npm install
 5. Selecione o canal desejado
 6. Copie a URL do webhook
 
-### 3. Configurar `services.json`
+### 3. Iniciar a Aplicação
 
-Copie `services_EXEMPLO.json` e renomeie para `services.json`:
-
-```json
-{
-  "services": [
-    {
-      "name": "AdobeARMservice",
-      "displayName": "Adobe Acrobat Update Service",
-      "critical": false,
-      "description": "Serviço de atualização",
-      "restartOnFailure": true
-    }
-  ],
-  "servidor": {
-    "port": 3000
-  },
-  "discord": {
-    "webhookUrl": "https://discord.com/api/webhooks/SEU_ID/SEU_TOKEN",
-    "sendStartupMessage": true,
-    "notifyOnRecovery": true
-  },
-  "monitoring": {
-    "checkInterval": 30000,
-    "maxRetries": 3,
-    "logLevel": "info"
-  }
-}
-```
-
-### 4. Iniciar a Aplicação
-
-**Opção 1: Interface Web (Recomendado)**
+**Opção 1: Interface Web (DEBUG)**
 ```powershell
 # Abre interface web em http://localhost:3000
-npm run web
+npm start
 ```
 
-**Opção 2: Monitor em Background**
-```powershell
-# Apenas monitora (sem interface web)
-npm run dev
-```
-
-**Opção 3: Produção com PM2**
+**Opção 2: Produção com PM2**
 ```powershell
 pm2 start app.js --name "Service Monitor Web"
 pm2 start src/monitor.js --name "Service Monitor"
 ```
+##### * Não recomendo pois teria inicia como administrador pra poder rodar comando no cmd de reinicio 
 
-### 5. Executar como Serviço do Windows (node-windows)
+### 5. Executar como Serviço do Windows (node-windows) Recomendado
 
 Para que o monitor consiga iniciar/parar/reiniciar serviços com mais estabilidade, você pode rodar a aplicação como **serviço do Windows** usando o `node-windows`:
 
@@ -181,6 +138,76 @@ Para que o monitor consiga iniciar/parar/reiniciar serviços com mais estabilida
 A interface estará disponível em: **http://localhost:3000**
 
 ##### * **Se porta padrão for 3000 se tiver alterado no services.json usar a denifida lá**
+
+### 4. Configurar 
+
+Acessar http://localhost:3000 *ou porta tiver parametrizado em configurações, configurar o webhook do discord e salvar e demais parametrizações forem necessarias.
+
+## 💾 Banco de Dados SQLite
+
+A partir da versão atual, toda persistência de dados é realizada em **banco de dados SQLite** em vez de arquivos JSON. Isso proporciona melhor performance, integridade de dados e facilita consultas e análises.
+
+### 📊 Estrutura do Banco de Dados
+
+#### Tabela: `users`
+Armazena credenciais do administrador
+```
+- id (INTEGER PRIMARY KEY)
+- username (STRING) - Nome de usuário único
+- password (STRING) - Senha criptografada com bcryptjs
+- createdAt (TIMESTAMP) - Data de criação
+```
+
+#### Tabela: `services`
+Armazena serviços sob monitoramento
+```
+- id (INTEGER PRIMARY KEY)
+- name (STRING) - Nome técnico do serviço (único)
+- displayName (STRING) - Nome de exibição
+- restartOnFailure (BOOLEAN) - Se deve reiniciar automaticamente
+- createdAt (TIMESTAMP) - Data de adição
+- updatedAt (TIMESTAMP) - Última atualização
+```
+
+#### Tabela: `monitoring_config`
+Armazena configurações globais do sistema
+```
+- id (INTEGER PRIMARY KEY)
+- servidor_porta (INTEGER) - Porta do servidor web
+- discord_webhook_url (STRING) - URL do webhook Discord
+- discord_send_startup (BOOLEAN) - Notificar ao iniciar
+- discord_notify_recovery (BOOLEAN) - Notificar ao recuperar
+- monitoring_check_interval (INTEGER) - Intervalo de verificação (ms)
+- monitoring_max_retries (INTEGER) - Máximo de tentativas de restart
+- monitoring_log_level (STRING) - Nível de log (debug/info/warn/error)
+```
+
+#### Tabela: `audit_logs`
+Registra todas as ações realizadas no sistema
+```
+- id (INTEGER PRIMARY KEY)
+- username (STRING) - Usuário que realizou a ação
+- action (STRING) - Tipo de ação (LOGIN, LOGOUT, START, STOP, RESTART, etc)
+- details (JSON) - Detalhes da ação
+- ip_address (STRING) - IP do cliente
+- createdAt (TIMESTAMP) - Data/hora da ação
+```
+
+### 📂 Localização do Banco de Dados
+
+O arquivo SQLite é armazenado em: `./src/database/banco.sqlite`
+
+### ✨ Benefícios do SQLite
+
+- ✅ **Armazenamento Persistente** - Dados salvos mesmo após reinicializações
+- ✅ **Performance** - Queries otimizadas comparado a leitura de JSON
+- ✅ **Integridade** - Relacionamentos e constraints garantem consistência
+- ✅ **Auditoria Completa** - Histórico de todas as ações
+- ✅ **Facilita Análises** - Consultas SQL complexas possíveis
+- ✅ **Sem Conflitos** - Locking automático previne corrupção de dados
+- ✅ **Backup Simples** - Apenas copiar o arquivo `.sqlite`
+
+##### * **Não há mais necessidade de configurar services.json manualmente - tudo é gerenciado via interface web!**
 
 
 ## 🌐 Interface Web
@@ -230,78 +257,6 @@ A interface estará disponível em: **http://localhost:3000**
 │  ✓ Atualiza logs                     │
 └──────────────────────────────────────┘
 ```
-
-## 📖 Configuração Completa
-
-### services.json - Todos os Parâmetros
-
-```json
-{
-  "services": [
-    {
-      "name": "ServiceName",           // Nome técnico (obrigatório)
-      "displayName": "Display Name",   // Nome para exibição (obrigatório)
-      "critical": true,                // Serviço crítico? (true/false)
-      "restartOnFailure": true,        // Reiniciar automaticamente? (true/false)
-      "description": "Descrição"       // Descrição (opcional)
-    }
-  ],
-  "servidor": {
-    "port": 3000                       // Porta web (padrão: 3000)
-  },
-  "discord": {
-    "webhookUrl": "https://...",       // URL do webhook (obrigatório)
-    "sendStartupMessage": true,        // Notificar ao iniciar?
-    "notifyOnRecovery": true           // Notificar quando recupera?
-  },
-  "monitoring": {
-    "checkInterval": 30000,            // Intervalo de verificação (ms)
-    "maxRetries": 3,                   // Max tentativas de restart
-    "logLevel": "info"                 // Nível de log: info/warn/error/debug
-  }
-}
-```
-
-### Exemplo com Múltiplos Serviços
-
-```json
-{
-  "services": [
-    {
-      "name": "MySQL80",
-      "displayName": "MySQL Database",
-      "critical": true,
-      "restartOnFailure": true
-    },
-    {
-      "name": "W3SVC",
-      "displayName": "IIS Web Server",
-      "critical": true,
-      "restartOnFailure": false
-    },
-    {
-      "name": "DockerDesktopService",
-      "displayName": "Docker Desktop",
-      "critical": false,
-      "restartOnFailure": false
-    }
-  ],
-  "servidor": {
-    "port": 3000
-  },
-  "discord": {
-    "webhookUrl": "https://discord.com/api/webhooks/...",
-    "sendStartupMessage": true,
-    "notifyOnRecovery": true
-  },
-  "monitoring": {
-    "checkInterval": 60000,
-    "maxRetries": 5,
-    "logLevel": "info"
-  }
-}
-```
-
 ## 🔍 Encontrar Nomes dos Serviços
 
 ### Via Interface Web
@@ -399,15 +354,14 @@ monitor-servicos/
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|
 | `POST` | `/api/discover-services` | Descobre serviços do Windows |
-| `GET` | `/api/discovered-services` | Carrega cache de serviços descobertos |
-| `GET` | `/api/monitored-services` | Carrega serviços em monitoramento |
-| `POST` | `/api/add-monitored-service` | Adiciona serviço ao monitoramento |
-| `DELETE` | `/api/monitored-services/:name` | Remove serviço do monitoramento |
+| `GET` | `/api/list-services` | Carrega serviços em monitoramento |
+| `POST` | `/api/add-service` | Adiciona serviço ao monitoramento |
+| `DELETE` | `/api/remove-service` | Remove serviço do monitoramento |
 
 ## 🛠️ Troubleshooting
 
 ### ❌ Erro: "Webhook URL do Discord não configurado"
-**Solução:** Adicione a URL em `services.json` na seção `discord.webhookUrl`
+**Solução:** Configurar na pagina WEB menu configuração a URL do Webhook
 
 ### ❌ Erro: "Sem notificações no Discord"
 **Solução:** 
@@ -431,7 +385,7 @@ monitor-servicos/
 
 ### ❌ Erro: "Porta 3000 já está em uso"
 **Solução:** 
-1. Edite `services.json` e altere `servidor.port` para outra porta
+1. Edite configuração na pagina WEB e altere para outra porta esteja disponível.
 2. Exemplo: `"port": 3001`
 3. Reinicie a aplicação
 
@@ -447,8 +401,6 @@ monitor-servicos/
 
 1. **Adicione `.gitignore`:**
 ```
-services.json
-.env
 logs/
 node_modules/
 .DS_Store
@@ -469,12 +421,7 @@ node_modules/
 
 ### Nível de Log
 
-Configure em `services.json`:
-```json
-"monitoring": {
-  "logLevel": "debug"  // info, warn, error, debug
-}
-```
+Configure em pagina web em configurações:
 
 ### Exemplo de Log
 
@@ -486,7 +433,6 @@ Configure em `services.json`:
 2025-12-26T14:31:00.100Z info: 🔄 Tentando reiniciar AdobeARMservice...
 2025-12-26T14:31:05.200Z info: ✅ Serviço AdobeARMservice reiniciado com sucesso
 ```
-
 ## 🚀 Deploy em Produção
 
 ### Com PM2
@@ -495,7 +441,7 @@ Configure em `services.json`:
 npm install -g pm2
 
 # Iniciar
-pm2 start pm2.json --name "Service Monitor Web"
+pm2 start app.js --name "Service Monitor Web"
 
 # Salvar config
 pm2 save
@@ -541,16 +487,6 @@ $body = @{
 Invoke-WebRequest -Uri $url -Method Post -Body $body -ContentType "application/json"
 ```
 
-### Ativar Debug Logging
-
-```json
-{
-  "monitoring": {
-    "logLevel": "debug"
-  }
-}
-```
-
 Então verifique `logs/combined.log`:
 ```powershell
 Get-Content logs/combined.log -Follow
@@ -587,9 +523,8 @@ Get-Process node
 
 ### 1. Configuração Inicial
 - [ ] Instalar dependências: `npm install`
-- [ ] Copiar `services_EXEMPLO.json` → `services.json`
 - [ ] Adicionar webhook do Discord
-- [ ] Rodar `npm run web`
+- [ ] Rodar `npm start`
 
 ### 2. Descobrir Serviços
 - [ ] Acessar http://localhost:3000
@@ -620,7 +555,7 @@ Tairone Morais
 
 ---
 
-**Última atualização:** 10 de fevereiro de 2026  
+**Última atualização:** 12 de fevereiro de 2026  
 **Versão:** 3.0.0 (Phase 3 - Admin Único & Melhorias)  
 **Status:** ✅ Pronto para Produção
 
@@ -628,7 +563,7 @@ Tairone Morais
 
 | Versão | Data | Destaques |
 |--------|------|----------|
-| 3.0.0 | 10/02/2026 | ✅ Admin Único, Slider Restart, Badges de Status, Página Registro, CORS |
+| 3.0.0 | 12/02/2026 | ✅ Admin Único, Slider Restart, Badges de Status, Página Registro, CORS, Banco de Dados |
 | 2.0.0 | 09/02/2026 | ✅ Autenticação JWT, Auditoria, Dark Mode, Responsivo |
 | 2.1.0 | 26/12/2025 | ✅ Interface Web completa, Notificações Discord |
 | 1.0.0 | 01/12/2025 | ✅ Monitor básico em background |

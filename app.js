@@ -24,10 +24,10 @@ async function initializeApp() {
         // ✅ Usar a porta do banco de dados com fallback
         const PORT = dataConfig?.servidor_porta || 3000;
         console.log(`[3] Porta configurada: ${PORT}`);
-        console.log('[3] Aplicação criada');
+        console.log('[4] Aplicação criada');
 
         // Middleware
-        console.log('[4] Configurando middlewares');
+        console.log('[5] Configurando middlewares');
         app.use(express.json());
         app.use(express.static('public'));
 
@@ -45,21 +45,21 @@ async function initializeApp() {
             next();
         });
 
-        console.log('[5] Middlewares configurados');
+        console.log('[6] Middlewares configurados');
 
         // Rotas de autenticação
-        console.log('[6] Configurando rotas');
+        console.log('[7] Configurando rotas');
         app.use('/', router);
 
         // Iniciar servidor
-        console.log('[7] Iniciando servidor...');
+        console.log('[8] Iniciando servidor...');
         const server = app.listen(PORT, () => {
             console.log(`✅ Servidor rodando em http://localhost:${PORT}`);
             logger.info(`🌐 Servidor rodando em http://localhost:${PORT}`);
             logger.info(`Abra seu navegador e acesse http://localhost:${PORT}`);
             
             // Iniciar monitor.js automaticamente após o servidor estar pronto
-            console.log('[8] Iniciando Monitor de Serviços...');
+            console.log('[9] Iniciando Monitor de Serviços...');
             startMonitor();
         });
 
