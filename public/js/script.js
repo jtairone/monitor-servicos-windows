@@ -787,6 +787,31 @@ function renderAuditLogs(logs) {
         return 'success';
     };
     
+    function getStatusText(status) {
+        if (status === 'failed') return 'Falhou';
+        if (status === 'logout') return 'Logout';
+        return 'Sucesso';
+    }
+
+    // Função que retorna a classe CSS baseada no status
+function getStatusColorClass(status) {
+        switch(status) {
+            case 'success':
+                return 'text-success';      // retorna a classe
+            case 'error':
+            case 'failed':
+                return 'text-danger';       // retorna a classe
+            case 'warning':
+                return 'text-warning';      // retorna a classe
+            case 'info':
+                return 'text-info';         // retorna a classe
+            case 'pending':
+                return 'text-pending';      // retorna a classe
+            default:
+                return 'text-secondary';    // retorna a classe
+        }
+    }
+
     container.innerHTML = logs.map(log => {
         // Parse details se for string
         const details = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
@@ -795,7 +820,11 @@ function renderAuditLogs(logs) {
             <div class="audit-item ${getStatusClass(log.status)}">
                 <div class="audit-info">
                     <div class="audit-action">
-                        <i class="fas fa-${getActionIcon(log.action)}"></i> ${log.action}
+                        <i class="fas fa-${getActionIcon(log.action)}"></i> ${log.action}</br>
+                        <span class="status-wrapper ${getStatusColorClass(log.status)}">
+                            <i class="fas fa-${getStatusIcon(log.status)}"></i> 
+                            ${getStatusText(log.status)}
+                        </span>
                     </div>
                     <div class="audit-user">${log.username}</div>
                     <div class="audit-details" style="margin-top: 4px; font-size: 0.85em; opacity: 0.8;">
@@ -833,6 +862,16 @@ function getActionIcon(action) {
         'REMOVE_SERVICE': 'trash',
         'DISCOVER_SERVICES': 'search',
         'UPDATE_SETTINGS': 'cog'
+    };
+    return icons[action] || 'info-circle';
+}
+
+function getStatusIcon(action) {
+    const icons = {
+        'success': 'check-circle',
+        'failed': 'times-circle',
+        'logout': 'sign-out-alt',
+        'info': 'info-circle'
     };
     return icons[action] || 'info-circle';
 }

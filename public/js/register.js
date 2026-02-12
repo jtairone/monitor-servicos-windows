@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:3001';
+const API_BASE = window.location.origin; //'http://localhost:3001';
 
 // Verificar se já existe um admin cadastrado ao carregar a página
 async function checkAdminExists() {

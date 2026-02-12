@@ -22,6 +22,5 @@ const Services = conexao.define('monitored_services', {
     }
 });
 
-conexao.sync();
-
+// Não sincronizar aqui - a inicialização é feita em src/database/init.js
 module.exports = Services;

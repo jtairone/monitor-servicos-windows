@@ -48,6 +48,5 @@ const Config = conexao.define('monitoring_config', {
     freezeTableName: true // Impede pluralização automática
 });
 
-// Sincronizar com o banco de dados (use com cuidado em produção)
-conexao.sync();
+// Não sincronizar aqui - a inicialização é feita em src/database/init.js
 module.exports = Config;

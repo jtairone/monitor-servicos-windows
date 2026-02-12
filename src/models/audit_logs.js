@@ -60,6 +60,5 @@ const AuditLog = conexao.define('audit_logs', {
     ] */
 });
 
-conexao.sync();
-
+// Não sincronizar aqui - a inicialização é feita em src/database/init.js
 module.exports = AuditLog;

@@ -1400,3 +1400,16 @@ body.dark-mode .hamburger-menu span {
         font-size: 16px;
     }
 }
+
+.status-wrapper {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.status-wrapper.text-success { color: #28a745; }
+.status-wrapper.text-danger { color: #dc3545; }
+.status-wrapper.text-warning { color: #ffc107; }
+.status-wrapper.text-info { color: #17a2b8; }
+.status-wrapper.text-pending { color: #ff8c00; }
+.status-wrapper.text-secondary { color: #6c757d; }

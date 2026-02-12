@@ -23,6 +23,5 @@ const Users = conexao.define('users', {
     }
 });
 
-conexao.sync();
-
+// Não sincronizar aqui - a inicialização é feita em src/database/init.js
 module.exports = Users;

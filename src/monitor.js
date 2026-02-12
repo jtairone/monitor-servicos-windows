@@ -20,8 +20,11 @@ class ServiceMonitor {
         try {
             this.config = await getConfig();
             this.services = await getServicesAll();
+            
             if (this.services.length === 0) {
-                throw new Error('Nenhum serviço configurado. Verifique o banco de dados.');
+                logger.warn('⚠️  Nenhum serviço configurado ainda. O monitor continuará aguardando...');
+                logger.info('💡 Adicione serviços através da interface web para começar o monitoramento');
+                return; // Não lança erro, apenas avisa
             }
             
             logger.info(`Carregados ${this.services.length} serviços para monitoramento`);
@@ -29,7 +32,7 @@ class ServiceMonitor {
                 logger.info(`Webhook Discord URL: ${this.config.discord_webhook_url.substring(0, 50)}...`);
             }
             
-            // Inicializar status
+            // Inicializar status apenas para serviços existentes
             for (const service of this.services) {
                 if (!this.serviceStatus.has(service.name)) this.serviceStatus.set(service.name, null);
                 if (!this.retryCount.has(service.name)) this.retryCount.set(service.name, 0);
@@ -37,7 +40,8 @@ class ServiceMonitor {
             
         } catch (error) {
             logger.error('Erro ao carregar serviços:', error);
-            throw error;
+            // Não lança erro aqui, permite que o monitor continue tentando
+            this.services = [];
         }
     }
 
@@ -274,13 +278,18 @@ if %ERRORLEVEL% equ 0 (
                 logger.info('Notificação de inicialização desabilitada nas configurações');
             }
             
-            logger.info(`Iniciando monitoramento de ${this.services.length} serviços`);
-            logger.info(`Intervalo de verificação: ${this.config.monitoring_check_interval / 1000} segundos`);
-            
-            // Verificar todos os serviços imediatamente
-            logger.info('▶️  Executando primeira verificação...');
-            for (const service of this.services) {
-                await this.monitorService(service);
+            if (this.services.length > 0) {
+                logger.info(`Iniciando monitoramento de ${this.services.length} serviços`);
+                logger.info(`Intervalo de verificação: ${this.config.monitoring_check_interval / 1000} segundos`);
+                
+                // Verificar todos os serviços imediatamente
+                logger.info('▶️  Executando primeira verificação...');
+                for (const service of this.services) {
+                    await this.monitorService(service);
+                }
+            } else {
+                logger.info('⏳ Monitor aguardando serviços serem adicionados...');
+                logger.info(`Intervalo de verificação: ${this.config.monitoring_check_interval / 1000} segundos`);
             }
             
             // Loop de verificação com intervalo dinâmico (lê do services.json a cada ciclo)
@@ -290,19 +299,23 @@ if %ERRORLEVEL% equ 0 (
                 const timestamp = new Date().toLocaleTimeString('pt-BR');
                 logger.info(`\n📍 VERIFICAÇÃO #${checkCount} - ${timestamp}`);
 
-                // Recarregar services.json a cada ciclo (sem precisar reiniciar)
+                // Recarregar configurações a cada ciclo (sem precisar reiniciar)
                 // Isso permite alterar restartOnFailure / lista de serviços / checkInterval em tempo real.
                 try {
                     await this.loadServices();
                 } catch (e) {
-                    logger.error('Erro ao recarregar services.json:', e.message);
+                    logger.error('Erro ao recarregar configurações:', e.message);
                 }
                 
-                for (const service of this.services) {
-                    await this.monitorService(service);
+                // Só monitorar se houver serviços configurados
+                if (this.services.length > 0) {
+                    for (const service of this.services) {
+                        await this.monitorService(service);
+                    }
+                    logger.info(`✅ Verificação #${checkCount} concluída (${this.services.length} serviços)\n`);
+                } else {
+                    logger.info(`⏳ Verificação #${checkCount} - Aguardando serviços...\n`);
                 }
-                
-                logger.info(`✅ Verificação #${checkCount} concluída\n`);
 
                 const interval = this.config?.monitoring_check_interval || 30000;
                 setTimeout(loop, interval);
