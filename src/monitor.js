@@ -241,8 +241,10 @@ if %ERRORLEVEL% equ 0 (
                 }
             }
             
-            // Enviar mensagem de inicialização
-            if (this.services.length > 0 && this.services && this.config?.discord_webhook_url) {
+            // Enviar mensagem de inicialização (apenas se Discord está configurado E habilitado)
+            if (this.services.length > 0 && 
+                this.config?.discord_webhook_url && 
+                this.config?.discord_send_startup === true) {
                 try {
                     const { hook: discordHook } = require('./sendNotification');
                     if (discordHook) {
@@ -268,6 +270,8 @@ if %ERRORLEVEL% equ 0 (
                 } catch (error) {
                     logger.error('Erro ao enviar mensagem de inicialização:', error.message);
                 }
+            } else if (!this.config?.discord_send_startup) {
+                logger.info('Notificação de inicialização desabilitada nas configurações');
             }
             
             logger.info(`Iniciando monitoramento de ${this.services.length} serviços`);

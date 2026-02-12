@@ -32,11 +32,18 @@ async function sendDiscordNotification(serviceConfig, oldStatus, newStatus) {
             const CONFIG = await getConfig();
             const SERVICES = await getServicesAll();
             
+            // ✅ VALIDAÇÃO CRÍTICA: Se não tem Discord configurado, não tenta enviar nada
+            if (!CONFIG?.discord_webhook_url || CONFIG.discord_webhook_url.trim() === '') {
+                logger.debug(`[${serviceConfig.name}] Discord não configurado. Pulando notificação.`);
+                return;
+            }
+            
             // ✅ VERIFICAR SE O HOOK PRECISA SER RECRIADO
             if (!hook || hook.webhookUrl !== CONFIG.discord_webhook_url) {
                 await initializeHook();
                 if (!hook) {
-                    throw new Error('Não foi possível inicializar webhook');
+                    logger.warn(`[${serviceConfig.name}] Não foi possível inicializar webhook Discord`);
+                    return;
                 }
             }
             

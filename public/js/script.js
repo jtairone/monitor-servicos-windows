@@ -432,12 +432,12 @@ function renderServicesList(services) {
         
         return `
         <div class="service-card">
-            <div class="service-header">
-                <div class="service-name">${name}</div>
+            <div class="service-badges">
                 <span class="service-status ${isRunning ? 'status-running' : 'status-stopped'}">
                     ${isRunning ? 'Rodando' : 'Parado'}
                 </span>
             </div>
+            <div class="service-name">${name}</div>
             <div class="service-description">${displayName}</div>
             <div class="service-actions">
                 ${isRunning
@@ -649,22 +649,20 @@ function renderMonitoredServices(services) {
         
         return `
         <div class="service-card">
-            <div class="service-header">
-                <div class="service-name">${name}</div>
-                <div style="display: flex; gap: 8px; align-items: center;">
-                    ${restartOnFailure 
-                        ? `<span class="service-badge badge-restart-active" title="Restart automático ativo">
-                            <i class="fas fa-sync-alt"></i> Auto-Restart
-                           </span>`
-                        : `<span class="service-badge badge-restart-inactive" title="Restart automático desativo">
-                            <i class="fas fa-ban"></i> Sem Restart
-                           </span>`
-                    }
-                    <span class="service-status ${isRunning ? 'status-running' : 'status-stopped'}">
-                        ${isRunning ? 'Rodando' : 'Parado'}
-                    </span>
-                </div>
+            <div class="service-badges">
+                ${restartOnFailure 
+                    ? `<span class="service-badge badge-restart-active" title="Restart automático ativo">
+                        <i class="fas fa-sync-alt"></i> Auto-Restart
+                       </span>`
+                    : `<span class="service-badge badge-restart-inactive" title="Restart automático desativo">
+                        <i class="fas fa-ban"></i> Sem Restart
+                       </span>`
+                }
+                <span class="service-status ${isRunning ? 'status-running' : 'status-stopped'}">
+                    ${isRunning ? 'Rodando' : 'Parado'}
+                </span>
             </div>
+            <div class="service-name">${name}</div>
             <div class="service-description">${displayName}</div>
             <div class="service-actions">
                 ${isRunning
