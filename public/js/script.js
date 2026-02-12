@@ -728,7 +728,7 @@ async function loadAuditLogs() {
         if (!response.ok) throw new Error('Erro ao carregar logs de auditoria');
 
         const data = await response.json();
-        allAuditLogs = data.logs || [];
+        allAuditLogs = data.logs.data || [];
         
         renderAuditLogs(allAuditLogs);
     } catch (error) {
@@ -747,27 +747,24 @@ function formatChanges(changes) {
         'port': 'Porta',
         'interval': 'Intervalo',
         'discordWebhookUrl': 'Webhook Discord',
-        'notifyOnStartup': 'Notificação no Início'
+        'notifyOnStartup': 'Notificação no Início',
+        'notifyOnRecovery': 'Notificação na Recuperação',
+        'maxRetries': 'Máximo de Tentativas',
+        'logLevel': 'Nível de Log'
     };
     
     Object.keys(changes).forEach(key => {
         const fieldName = fieldNames[key] || key;
-        const oldVal = changes[key].old;
-        const newVal = changes[key].new;
-        
+        const Value = changes[key];
         // Formata valores específicos
-        let formattedOld = oldVal;
-        let formattedNew = newVal;
-        
+        let formattedValue = Value;
         if (key === 'interval') {
-            formattedOld = `${oldVal}ms`;
-            formattedNew = `${newVal}ms`;
-        } else if (key === 'notifyOnStartup') {
-            formattedOld = oldVal ? 'Sim' : 'Não';
-            formattedNew = newVal ? 'Sim' : 'Não';
+            formattedValue = `${formattedValue}ms`;
+        } else if (key === 'notifyOnStartup' || key === 'notifyOnRecovery') {
+            formattedValue = formattedValue ? 'Sim' : 'Não';
         }
-        
-        items.push(`${fieldName}: ${formattedOld} → ${formattedNew}`);
+        console.log('Campo:', key, 'Valor formatado:', Value);
+        items.push(`${fieldName}: ${formattedValue}`);
     });
     
     return items.join('<br>');
@@ -792,25 +789,30 @@ function renderAuditLogs(logs) {
         return 'success';
     };
     
-    container.innerHTML = logs.map(log => `
-        <div class="audit-item ${getStatusClass(log.status)}">
-            <div class="audit-info">
-                <div class="audit-action">
-                    <i class="fas fa-${getActionIcon(log.action)}"></i> ${log.action}
+    container.innerHTML = logs.map(log => {
+        // Parse details se for string
+        const details = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+        
+        return `
+            <div class="audit-item ${getStatusClass(log.status)}">
+                <div class="audit-info">
+                    <div class="audit-action">
+                        <i class="fas fa-${getActionIcon(log.action)}"></i> ${log.action}
+                    </div>
+                    <div class="audit-user">${log.username}</div>
+                    <div class="audit-details" style="margin-top: 4px; font-size: 0.85em; opacity: 0.8;">
+                        ${details.count ? `<span><i class="fas fa-list-ol"></i> ${details.count} itens</span>` : ''}
+                        ${details.count && details.ip ? ' <span class="separator">|</span> ' : ''}
+                        ${details.ip ? `<span><i class="fas fa-network-wired"></i> ${details.ip}</span>` : ''}
+                        ${details.serviceName || details.changes ? ' <span class="separator">|</span> ' : ''}
+                        ${details.serviceName ? `<span><i class="fas fa-cogs"></i> ${details.serviceName}</span>` : ''}
+                        ${details.changes ? formatChanges(details.changes) : ''}
+                    </div>
                 </div>
-                <div class="audit-user">${log.username}</div>
-                <div class="audit-details" style="margin-top: 4px; font-size: 0.85em; opacity: 0.8;">
-                    ${log.details.count ? `<span><i class="fas fa-list-ol"></i> ${log.details.count} itens</span>` : ''}
-                    ${log.details.count && log.details.ip ? ' <span class="separator">|</span> ' : ''}
-                    ${log.details.ip ? `<span><i class="fas fa-network-wired"></i> ${log.details.ip}</span>` : ''}
-                    ${log.details.serviceName || log.details.changes ? ' <span class="separator">|</span> ' : ''}
-                    ${log.details.serviceName ? `<span><i class="fas fa-cogs"></i> ${log.details.serviceName}</span>` : ''}
-                    ${log.details.changes ? formatChanges(log.details.changes) : ''}
-                </div>
+                <div class="audit-time">${formatDate(log.createdAt)}</div>
             </div>
-            <div class="audit-time">${formatDate(log.timestamp)}</div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function filterAuditLogs() {
