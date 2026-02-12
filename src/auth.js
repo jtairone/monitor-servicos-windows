@@ -3,9 +3,10 @@ const jwt = require('jsonwebtoken');
 const fs = require('fs').promises;
 const path = require('path');
 const { setUsers, getUsers } = require('./getSets/getSetUsers');
+require('dotenv').config();
 
-const JWT_SECRET = '!hjj*!a7S.YEnc2ivQfJ959s8@#%$^&*()_+';
-const JWT_EXPIRY = '24h';
+const JWT_SECRET = process.env.JWT_SECRET || '';
+const JWT_EXPIRY = process.env.JWT_EXPIRY || '24h';
 
 // Funções de autenticação
 const auth = {

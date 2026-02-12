@@ -15,7 +15,7 @@ const {
 } = require('./src/funcoes');
 const { getServicesAll, getService, setService, delService } = require('./src/getSets/getSetServices');
 const { getConfig, setUpdateConfig } = require('./src/getSets/getSetConfig');
-
+const { validators } = require('./src/validators');
 // Página principal
 router.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -200,7 +200,7 @@ router.get('/api/settings', auth.authMiddleware, auth.adminMiddleware, async (re
 });
 
 // Salvar configurações
-router.post('/api/settings', auth.authMiddleware, auth.adminMiddleware, async (req, res) => {
+router.post('/api/settings', validators.updateSettings, auth.authMiddleware, auth.adminMiddleware, async (req, res) => {
     try {
         const { 
             discordWebhookUrl, 
@@ -274,7 +274,7 @@ router.get('/api/list-services', auth.authMiddleware, async (req, res) => {
 });
 
 // POST /api/add-service (alias para /api/add-monitored-service)
-router.post('/api/add-service', auth.authMiddleware, async (req, res) => {
+router.post('/api/add-service', validators.addService, auth.authMiddleware,  async (req, res) => {
     try {
         const { name, displayName, restartOnFailure } = req.body;
         if (!name || !displayName) {
@@ -286,7 +286,7 @@ router.post('/api/add-service', auth.authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Serviço já está sendo monitorado' });
         }
         setService({ name, displayName, restartOnFailure: Boolean(restartOnFailure) });        
-        audit.logAction(req.user.username, 'ADD_SERVICE', name, 'success');
+        audit.logAction(req.user.username, 'ADD_SERVICE', { ip: req.ip, serviceName: name }, 'success');
         res.json({ success: true, message: 'Serviço adicionado com sucesso' });
     } catch (error) {
         audit.logAction(req.user?.username || 'unknown', 'ADD_SERVICE', '', 'failed');
@@ -302,7 +302,7 @@ router.post('/api/remove-service', auth.authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Nome do serviço é obrigatório' });
         }
         await delService(name);
-        audit.logAction(req.user.username, 'REMOVE_SERVICE', name, 'success');
+        audit.logAction(req.user.username, 'REMOVE_SERVICE', { ip: req.ip, serviceName: name }, 'success');
         res.json({ success: true, message: 'Serviço removido com sucesso' });
     } catch (error) {
         audit.logAction(req.user?.username || 'unknown', 'REMOVE_SERVICE', '', 'failed');

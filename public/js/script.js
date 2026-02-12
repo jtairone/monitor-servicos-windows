@@ -280,17 +280,6 @@ function setupEventListeners() {
         logoutBtn.addEventListener('click', logout);
     }
 
-    // Search filters
-    /* const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        searchInput.addEventListener('input', filterServices);
-    }
-
-    const statusFilter = document.getElementById('statusFilter');
-    if (statusFilter) {
-        statusFilter.addEventListener('change', filterServices);
-    } */
-
     const auditSearchInput = document.getElementById('auditSearchInput');
     if (auditSearchInput) {
         auditSearchInput.addEventListener('input', filterAuditLogs);
@@ -441,17 +430,17 @@ function renderServicesList(services) {
             <div class="service-description">${displayName}</div>
             <div class="service-actions">
                 ${isRunning
-                    ? `<button class="btn btn-sm btn-secondary" onclick="stopService('${name}')">
+                    ? `<button class="btn btn-sm btn-secondary" onclick="stopService('${escapeHtml(name)}')">
                         <i class="fas fa-stop"></i> Parar
                       </button>`
-                    : `<button class="btn btn-sm btn-success" onclick="startService('${name}')">
+                    : `<button class="btn btn-sm btn-success" onclick="startService('${escapeHtml(name)}')">
                         <i class="fas fa-play"></i> Iniciar
                       </button>`
                 }
-                <button class="btn btn-sm btn-warning" onclick="restartService('${name}')">
+                <button class="btn btn-sm btn-warning" onclick="restartService('${escapeHtml(name)}')">
                     <i class="fas fa-sync"></i> Reiniciar
                 </button>
-                <button class="btn btn-sm btn-primary" onclick="addToMonitored('${name}', '${displayName}')">
+                <button class="btn btn-sm btn-primary" onclick="addToMonitored('${escapeHtml(name)}', '${escapeHtml(displayName)}')">
                     <i class="fas fa-plus"></i> Monitorar
                 </button>
             </div>
@@ -641,8 +630,8 @@ function renderMonitoredServices(services) {
     }
 
     container.innerHTML = services.map(service => {
-        const name = service.name;
-        const displayName = service.displayName || name;
+        const name = escapeHtml(service.name);
+        const displayName = escapeHtml(service.displayName) || escapeHtml(name);
         const status = service.status || 'unknown';
         const isRunning = status === 'running' || status === 'Running';
         const restartOnFailure = service.restartOnFailure || false;
@@ -666,14 +655,14 @@ function renderMonitoredServices(services) {
             <div class="service-description">${displayName}</div>
             <div class="service-actions">
                 ${isRunning
-                    ? `<button class="btn btn-sm btn-secondary" onclick="stopService('${name}')">
+                    ? `<button class="btn btn-sm btn-secondary" onclick="stopService('${escapeHtml(name)}')">
                         <i class="fas fa-stop"></i> Parar
                       </button>`
-                    : `<button class="btn btn-sm btn-success" onclick="startService('${name}')">
+                    : `<button class="btn btn-sm btn-success" onclick="startService('${escapeHtml(name)}')">
                         <i class="fas fa-play"></i> Iniciar
                       </button>`
                 }
-                <button class="btn btn-sm btn-danger" onclick="removeMonitored('${name}')">
+                <button class="btn btn-sm btn-danger" onclick="removeMonitored('${escapeHtml(name)}')">
                     <i class="fas fa-trash"></i> Remover
                 </button>
             </div>
@@ -721,6 +710,11 @@ async function removeMonitored(serviceName) {
 
 async function loadAuditLogs() {
     try {
+        const btn = document.getElementById('refreshAuditBtn');
+        const originalHTML = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando...';
+
         const response = await fetch(`${API_BASE}/api/audit-logs`, {
             headers: getAuthHeader()
         });
@@ -731,6 +725,11 @@ async function loadAuditLogs() {
         allAuditLogs = data.logs.data || [];
         
         renderAuditLogs(allAuditLogs);
+        btn.innerHTML = '<i class="fas fa-check-circle"></i> Atualizando!';
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+        showToast('Logs de auditoria atualizados', 'success');
     } catch (error) {
         showToast(error.message, 'error');
         console.error(error);
@@ -763,7 +762,6 @@ function formatChanges(changes) {
         } else if (key === 'notifyOnStartup' || key === 'notifyOnRecovery') {
             formattedValue = formattedValue ? 'Sim' : 'Não';
         }
-        console.log('Campo:', key, 'Valor formatado:', Value);
         items.push(`${fieldName}: ${formattedValue}`);
     });
     
