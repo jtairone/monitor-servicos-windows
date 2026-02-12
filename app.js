@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const router = require('./router');
 const { getConfig } = require('./src/getSets/getSetConfig');
+const { initializeDatabase } = require('./src/database/init');
 
 // Variável global para armazenar o processo do monitor
 let monitorProcess = null;
@@ -14,6 +15,9 @@ const logger = require('./src/logger');
 // Função async para inicializar a aplicação
 async function initializeApp() {
     try {
+        console.log('[0] Inicializando banco de dados...');
+        await initializeDatabase();
+        
         console.log('[1] Carregando configurações...');
         const dataConfig = await getConfig();
         
